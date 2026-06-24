@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import type { User } from "@supabase/supabase-js";
+import { signInWithMagicLink } from "@/services/auth";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -141,6 +144,11 @@ export default function HomePage() {
   const [scrolled, setScrolled] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [authName, setAuthName] = useState("");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [activeFilter, setActiveFilter] = useState("all");
   const [activeTrack, setActiveTrack] = useState<number | null>(null);
 
@@ -204,13 +212,42 @@ export default function HomePage() {
     return () => document.removeEventListener("keydown", handler);
   }, [togglePlay]);
 
+  // Track auth session → swaps nav buttons
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // Open the modal if redirected here needing auth
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const flag = p.get("auth");
+    if (flag === "required") { setAuthError("Inicia sesión para acceder a tu panel."); setModalOpen(true); }
+    else if (flag === "error") { setAuthError("El enlace expiró o no es válido. Pide uno nuevo."); setModalOpen(true); }
+  }, []);
+
   const selectQueue = (i: number) => { setQueueIdx(i); setProgress(0); if (isPlaying) startPlay(); };
   const playedBars = Math.floor(progress * heroBars.length);
   const elapsed = Math.floor(progress * 163);
   const timeDisplay = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")} / ${current.duration}`;
 
   const handleTrack = (id: number) => setActiveTrack((cur) => (cur === id ? null : id));
-  const handleSubmit = () => { setFormSubmitted(true); setTimeout(() => { setModalOpen(false); setFormSubmitted(false); }, 2200); };
+
+  const handleSubmit = async () => {
+    setAuthError(null);
+    if (!authEmail.trim()) { setAuthError("Escribe tu email."); return; }
+    if (!isSupabaseConfigured) { setAuthError("Auth aún no configurado: faltan las claves de Supabase."); return; }
+    setAuthLoading(true);
+    const { error } = await signInWithMagicLink(authEmail.trim(), authName.trim() || undefined);
+    setAuthLoading(false);
+    if (error) { setAuthError(error.message); return; }
+    setFormSubmitted(true);
+  };
+
+  const closeModal = () => { setModalOpen(false); setAuthError(null); setFormSubmitted(false); };
 
   const filtered = activeFilter === "all" ? TRACKS : TRACKS.filter((t) => t.genre === activeFilter);
 
@@ -235,8 +272,14 @@ export default function HomePage() {
           </ul>
 
           <div className="zl-nav__actions">
-            <button className="zl-nav__login zl-hide-md" onClick={() => setModalOpen(true)}>Iniciar sesión</button>
-            <button className="zl-btn zl-btn--primary zl-btn--sm" onClick={() => setModalOpen(true)}>Empezar gratis</button>
+            {user ? (
+              <a href="/dashboard" className="zl-btn zl-btn--primary zl-btn--sm">Mi panel</a>
+            ) : (
+              <>
+                <button className="zl-nav__login zl-hide-md" onClick={() => setModalOpen(true)}>Iniciar sesión</button>
+                <button className="zl-btn zl-btn--primary zl-btn--sm" onClick={() => setModalOpen(true)}>Empezar gratis</button>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -634,20 +677,31 @@ export default function HomePage() {
 
       {/* ── MODAL ── */}
       {modalOpen && (
-        <div className="zl-overlay" onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }} role="dialog" aria-modal="true" aria-label="Registro">
+        <div className="zl-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }} role="dialog" aria-modal="true" aria-label="Registro">
           <div className="zl-modal">
-            <button className="zl-modal__close" onClick={() => setModalOpen(false)} aria-label="Cerrar">✕</button>
+            <button className="zl-modal__close" onClick={closeModal} aria-label="Cerrar">✕</button>
             <h3 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: 8, letterSpacing: "-0.02em" }}>Escucha el catálogo completo</h3>
             <p style={{ fontSize: "0.9rem", color: "var(--text-2)", marginBottom: 24 }}>Crea tu cuenta gratis y accede a todo. Sin tarjeta, sin compromiso.</p>
             {formSubmitted ? (
-              <div style={{ textAlign: "center", padding: "24px 0", color: "var(--lime)", fontWeight: 700 }}>✓ ¡Listo! Revisa tu email</div>
+              <div style={{ textAlign: "center", padding: "20px 4px" }}>
+                <div style={{ fontSize: "2rem", marginBottom: 10 }}>📬</div>
+                <div style={{ color: "var(--lime)", fontWeight: 700, marginBottom: 6 }}>Revisa tu email</div>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-2)", lineHeight: 1.55 }}>
+                  Te enviamos un enlace mágico a <strong style={{ color: "var(--text)" }}>{authEmail}</strong>. Ábrelo para entrar a tu panel.
+                </p>
+              </div>
             ) : (
               <>
                 <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-2)", marginBottom: 6 }}>Nombre</label>
-                <input className="zl-input" type="text" placeholder="Tu nombre" style={{ marginBottom: 16 }} />
+                <input className="zl-input" type="text" placeholder="Tu nombre" value={authName} onChange={(e) => setAuthName(e.target.value)} style={{ marginBottom: 16 }} />
                 <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-2)", marginBottom: 6 }}>Email</label>
-                <input className="zl-input" type="email" placeholder="tuemail@ejemplo.com" style={{ marginBottom: 22 }} />
-                <button className="zl-btn zl-btn--primary zl-btn--block" onClick={handleSubmit}>Crear cuenta gratis <Arrow /></button>
+                <input className="zl-input" type="email" placeholder="tuemail@ejemplo.com" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }} style={{ marginBottom: authError ? 12 : 22 }} />
+                {authError && (
+                  <p style={{ fontSize: "0.8rem", color: "var(--orange)", marginBottom: 18, lineHeight: 1.45 }}>{authError}</p>
+                )}
+                <button className="zl-btn zl-btn--primary zl-btn--block" onClick={handleSubmit} disabled={authLoading}>
+                  {authLoading ? "Enviando…" : <>Crear cuenta gratis <Arrow /></>}
+                </button>
                 <p style={{ textAlign: "center", fontSize: "0.75rem", color: "var(--text-3)", marginTop: 12 }}>Te enviaremos un link mágico. Sin contraseñas.</p>
               </>
             )}
