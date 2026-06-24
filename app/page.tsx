@@ -2,917 +2,673 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────────────────────
 
 interface Track {
   id: number;
   name: string;
+  artist: string;
   genre: string;
-  emoji: string;
+  cover: CoverVariant;
+  glyph: string;
   bpm: number;
   duration: string;
   mood: string;
-  key: string;
-  tags: string[];
 }
 
-interface QueueItem {
-  name: string;
-  meta: string;
-  duration: string;
-  tag: string;
-}
+type CoverVariant =
+  | "violet" | "lime" | "orange" | "magenta" | "teal" | "gold" | "ice" | "ember";
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+// ─── Cover art (gradient-mesh "album art", no images needed) ────────────────
 
-const TRACKS: Track[] = [
-  { id: 1, name: "Midnight Drive", genre: "cinematic", emoji: "🎬", bpm: 118, duration: "2:43", mood: "Épico", key: "G Min", tags: ["Boda", "Documental", "Viaje"] },
-  { id: 2, name: "Morning Light", genre: "lofi", emoji: "☕", bpm: 84, duration: "3:15", mood: "Tranquilo", key: "C Maj", tags: ["Vlog", "Estudio", "Lifestyle"] },
-  { id: 3, name: "Corporate Pulse", genre: "corporate", emoji: "💼", bpm: 120, duration: "2:28", mood: "Motivacional", key: "E Min", tags: ["YouTube", "Presentación", "B2B"] },
-  { id: 4, name: "Heaven's Gate", genre: "worship", emoji: "✨", bpm: 72, duration: "4:02", mood: "Reverente", key: "D Maj", tags: ["Culto", "Ministerio", "Adoración"] },
-  { id: 5, name: "Reel Hook", genre: "social", emoji: "📱", bpm: 128, duration: "0:30", mood: "Energético", key: "A Min", tags: ["Reels", "TikTok", "Shorts"] },
-  { id: 6, name: "Deep Focus", genre: "podcast", emoji: "🎙️", bpm: 90, duration: "3:40", mood: "Concentrado", key: "F Maj", tags: ["Podcast", "Intro", "Fondo"] },
-  { id: 7, name: "Golden Hour", genre: "cinematic", emoji: "🌅", bpm: 96, duration: "3:20", mood: "Nostálgico", key: "A Maj", tags: ["Boda", "Retrato", "Drone"] },
-  { id: 8, name: "Lo-fi Rain", genre: "lofi", emoji: "🌧️", bpm: 78, duration: "2:55", mood: "Melancólico", key: "E Min", tags: ["Vlog", "Estudio", "Stream"] },
-  { id: 9, name: "Brand Launch", genre: "corporate", emoji: "🚀", bpm: 126, duration: "2:10", mood: "Ambicioso", key: "B Min", tags: ["Comercial", "Marca", "Ads"] },
-];
-
-const HERO_QUEUE: QueueItem[] = [
-  { name: "Midnight Drive", meta: "Cinematic · 118 BPM", duration: "2:43", tag: "🎬" },
-  { name: "Golden Hour", meta: "Cinematic · 96 BPM", duration: "3:20", tag: "🌅" },
-  { name: "Heaven's Gate", meta: "Worship · 72 BPM", duration: "4:02", tag: "✨" },
-];
-
-const CARD_GRADIENTS: Record<string, string> = {
-  cinematic: "linear-gradient(135deg,rgba(87,35,252,0.4),rgba(87,35,252,0.1))",
-  lofi:      "linear-gradient(135deg,rgba(245,166,35,0.3),rgba(245,166,35,0.08))",
-  corporate: "linear-gradient(135deg,rgba(30,120,255,0.3),rgba(30,120,255,0.08))",
-  worship:   "linear-gradient(135deg,rgba(34,197,94,0.3),rgba(34,197,94,0.08))",
-  social:    "linear-gradient(135deg,rgba(236,72,153,0.3),rgba(236,72,153,0.08))",
-  podcast:   "linear-gradient(135deg,rgba(139,92,246,0.3),rgba(139,92,246,0.08))",
+const COVERS: Record<CoverVariant, string> = {
+  violet:  "radial-gradient(120% 120% at 18% 18%, #8B6BFF 0%, transparent 52%), radial-gradient(120% 120% at 86% 4%, #6E3BFF 0%, transparent 46%), linear-gradient(155deg, #1a1230, #0d0d0d)",
+  lime:    "radial-gradient(120% 120% at 82% 16%, #CDFF4F 0%, transparent 46%), radial-gradient(110% 110% at 8% 92%, #4f6f1a 0%, transparent 52%), linear-gradient(155deg, #161a0c, #0d0d0d)",
+  orange:  "radial-gradient(120% 120% at 20% 82%, #FF8B3D 0%, transparent 52%), radial-gradient(110% 110% at 92% 10%, #ff4d6d 0%, transparent 46%), linear-gradient(155deg, #20120a, #0d0d0d)",
+  magenta: "radial-gradient(120% 120% at 80% 80%, #ff4db8 0%, transparent 50%), radial-gradient(110% 110% at 10% 14%, #7a2bff 0%, transparent 48%), linear-gradient(155deg, #1c0f1e, #0d0d0d)",
+  teal:    "radial-gradient(120% 120% at 22% 24%, #2bd6c0 0%, transparent 50%), radial-gradient(110% 110% at 88% 86%, #2b7bff 0%, transparent 48%), linear-gradient(155deg, #0a1a1c, #0d0d0d)",
+  gold:    "radial-gradient(120% 120% at 80% 22%, #f7c752 0%, transparent 48%), radial-gradient(110% 110% at 12% 88%, #ff8b3d 0%, transparent 50%), linear-gradient(155deg, #1d160a, #0d0d0d)",
+  ice:     "radial-gradient(120% 120% at 24% 18%, #9fd2ff 0%, transparent 50%), radial-gradient(110% 110% at 86% 88%, #8B6BFF 0%, transparent 48%), linear-gradient(155deg, #11161f, #0d0d0d)",
+  ember:   "radial-gradient(120% 120% at 78% 76%, #ff5e3d 0%, transparent 50%), radial-gradient(110% 110% at 16% 16%, #ff2d55 0%, transparent 46%), linear-gradient(155deg, #1e0e0c, #0d0d0d)",
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Data ──────────────────────────────────────────────────────────────────
 
-function randomBars(count: number): number[] {
-  return Array.from({ length: count }, () => 8 + Math.random() * 20);
+const TRACKS: Track[] = [
+  { id: 1, name: "Midnight Drive",  artist: "Cinematic",  genre: "cinematic", cover: "violet",  glyph: "🎬", bpm: 118, duration: "2:43", mood: "Épico" },
+  { id: 2, name: "Golden Hour",     artist: "Cinematic",  genre: "cinematic", cover: "gold",    glyph: "🌅", bpm: 96,  duration: "3:20", mood: "Nostálgico" },
+  { id: 3, name: "Heaven's Gate",   artist: "Worship",    genre: "worship",   cover: "ice",     glyph: "✨", bpm: 72,  duration: "4:02", mood: "Reverente" },
+  { id: 4, name: "Morning Light",   artist: "Lo-fi",      genre: "lofi",      cover: "orange",  glyph: "☕", bpm: 84,  duration: "3:15", mood: "Tranquilo" },
+  { id: 5, name: "Corporate Pulse", artist: "Corporate",  genre: "corporate", cover: "teal",    glyph: "💼", bpm: 120, duration: "2:28", mood: "Motivacional" },
+  { id: 6, name: "Reel Hook",       artist: "Social",     genre: "social",    cover: "magenta", glyph: "📱", bpm: 128, duration: "0:30", mood: "Energético" },
+  { id: 7, name: "Deep Focus",      artist: "Podcast",    genre: "podcast",   cover: "violet",  glyph: "🎙️", bpm: 90,  duration: "3:40", mood: "Concentrado" },
+  { id: 8, name: "Lo-fi Rain",      artist: "Lo-fi",      genre: "lofi",      cover: "ice",     glyph: "🌧️", bpm: 78,  duration: "2:55", mood: "Melancólico" },
+  { id: 9, name: "Brand Launch",    artist: "Corporate",  genre: "corporate", cover: "ember",   glyph: "🚀", bpm: 126, duration: "2:10", mood: "Ambicioso" },
+  { id: 10, name: "Neon Skyline",   artist: "Cinematic",  genre: "cinematic", cover: "magenta", glyph: "🌃", bpm: 110, duration: "3:05", mood: "Épico" },
+  { id: 11, name: "Quiet Sanctuary", artist: "Worship",   genre: "worship",   cover: "violet",  glyph: "🕊️", bpm: 68,  duration: "4:30", mood: "Reverente" },
+  { id: 12, name: "Late Study",     artist: "Lo-fi",      genre: "lofi",      cover: "teal",    glyph: "📚", bpm: 80,  duration: "3:12", mood: "Tranquilo" },
+];
+
+const FEATURED = [1, 2, 6, 9, 10, 3].map((id) => TRACKS.find((t) => t.id === id)!);
+const TRENDING = [1, 6, 2, 9, 5, 10, 4, 3].map((id) => TRACKS.find((t) => t.id === id)!);
+const NEW_MUSIC = [11, 12, 10, 8].map((id) => TRACKS.find((t) => t.id === id)!);
+const STAFF_HERO = TRACKS[1]; // Golden Hour
+const STAFF_LIST = [3, 7, 5, 12].map((id) => TRACKS.find((t) => t.id === id)!);
+
+const GENRES = [
+  { name: "Cinematic", count: 42, cover: "violet" as CoverVariant, glyph: "🎬" },
+  { name: "Lo-fi",     count: 31, cover: "orange" as CoverVariant, glyph: "🌧️" },
+  { name: "Worship",   count: 28, cover: "ice"    as CoverVariant, glyph: "✨" },
+  { name: "Corporate", count: 24, cover: "teal"   as CoverVariant, glyph: "💼" },
+  { name: "Social",    count: 36, cover: "magenta" as CoverVariant, glyph: "📱" },
+  { name: "Podcast",   count: 19, cover: "gold"   as CoverVariant, glyph: "🎙️" },
+];
+
+const MOODS = [
+  { name: "Épico",       count: 26, cover: "ember"   as CoverVariant },
+  { name: "Tranquilo",   count: 33, cover: "teal"    as CoverVariant },
+  { name: "Motivacional", count: 22, cover: "lime"   as CoverVariant },
+  { name: "Melancólico", count: 18, cover: "ice"     as CoverVariant },
+  { name: "Energético",  count: 29, cover: "magenta" as CoverVariant },
+  { name: "Reverente",   count: 15, cover: "violet"  as CoverVariant },
+];
+
+const FILTERS = [
+  { label: "Todo", value: "all" },
+  { label: "Cinematic", value: "cinematic" },
+  { label: "Lo-fi", value: "lofi" },
+  { label: "Worship", value: "worship" },
+  { label: "Corporate", value: "corporate" },
+  { label: "Social", value: "social" },
+  { label: "Podcast", value: "podcast" },
+];
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+// Deterministic bars (avoids hydration mismatch + flicker)
+function bars(seed: number, n: number): number[] {
+  const out: number[] = [];
+  let s = (seed * 9301 + 49297) % 233280;
+  for (let i = 0; i < n; i++) {
+    s = (s * 9301 + 49297) % 233280;
+    out.push(8 + (s / 233280) * 26);
+  }
+  return out;
 }
 
-// ─── Components ──────────────────────────────────────────────────────────────
+// ─── Icons ─────────────────────────────────────────────────────────────────
 
-function PlayIcon({ playing }: { playing: boolean }) {
+function Play({ size = 18 }: { size?: number }) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor"><path d="M8 5v14l11-7z" /></svg>;
+}
+function Pause({ size = 18 }: { size?: number }) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>;
+}
+function Arrow() {
+  return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>;
+}
+
+// ─── Reusable pieces ─────────────────────────────────────────────────────────
+
+function Cover({ variant, glyph, radius }: { variant: CoverVariant; glyph?: string; radius?: number }) {
   return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="white">
-      {playing
-        ? <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-        : <path d="M8 5v14l11-7z" />}
-    </svg>
+    <div className="zl-cover" style={radius ? { borderRadius: radius } : undefined}>
+      <div style={{ position: "absolute", inset: 0, background: COVERS[variant] }} />
+      <div className="zl-cover__vignette" />
+      {glyph && <span className="zl-cover__glyph">{glyph}</span>}
+    </div>
   );
 }
 
-function SmallPlayIcon({ playing }: { playing: boolean }) {
+function SectionHeader({ eyebrow, title, desc, action }: { eyebrow: string; title: string; desc?: string; action?: string }) {
   return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-      {playing
-        ? <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-        : <path d="M8 5v14l11-7z" />}
-    </svg>
+    <div className="zl-shead" data-reveal>
+      <div>
+        <span className="zl-eyebrow">{eyebrow}</span>
+        <h2 className="zl-h2" style={{ marginTop: 12 }}>{title}</h2>
+        {desc && <p>{desc}</p>}
+      </div>
+      {action && (
+        <a href="#catalog" className="zl-shead__link">{action} <Arrow /></a>
+      )}
+    </div>
   );
 }
 
-// ─── Main Page ───────────────────────────────────────────────────────────────
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
+  const [scrolled, setScrolled] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [activeTrack, setActiveTrack] = useState<number | null>(null);
+
+  // Hero player
   const [isPlaying, setIsPlaying] = useState(false);
   const [queueIdx, setQueueIdx] = useState(0);
   const [progress, setProgress] = useState(0);
-  const [playingCardId, setPlayingCardId] = useState<number | null>(null);
-  const [activeFilter, setActiveFilter] = useState("all");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [formSubmitted, setFormSubmitted] = useState(false);
-  const [waveBars] = useState(() => randomBars(60));
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const cardIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [, forceRender] = useState(0);
 
-  const currentTrack = HERO_QUEUE[queueIdx];
+  const heroQueue = FEATURED.slice(0, 3);
+  const current = heroQueue[queueIdx];
+  const heroBars = bars(7, 56);
 
-  // Hero play/pause
   const startPlay = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 1) {
-          setQueueIdx(i => (i + 1) % HERO_QUEUE.length);
-          return 0;
-        }
-        return prev + 0.004;
+      setProgress((p) => {
+        if (p >= 1) { setQueueIdx((i) => (i + 1) % heroQueue.length); return 0; }
+        return p + 0.004;
       });
     }, 80);
-  }, []);
+  }, [heroQueue.length]);
 
   const togglePlay = useCallback(() => {
-    setIsPlaying(prev => {
-      if (!prev) startPlay();
+    setIsPlaying((p) => {
+      if (!p) startPlay();
       else if (intervalRef.current) clearInterval(intervalRef.current);
-      return !prev;
+      return !p;
     });
   }, [startPlay]);
 
+  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
+
+  // Nav scroll state
   useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (cardIntervalRef.current) clearInterval(cardIntervalRef.current);
-    };
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Space bar shortcut
+  // Scroll reveal
+  useEffect(() => {
+    const els = document.querySelectorAll("[data-reveal]");
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("is-visible"); io.unobserve(e.target); } }),
+      { threshold: 0.1, rootMargin: "0px 0px -40px 0px" },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
+  // Keyboard: space toggles, escape closes modal
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.code === "Space" && (e.target as HTMLElement).tagName !== "INPUT") {
-        e.preventDefault();
-        togglePlay();
-      }
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (e.code === "Space" && tag !== "INPUT" && tag !== "TEXTAREA") { e.preventDefault(); togglePlay(); }
+      if (e.key === "Escape") setModalOpen(false);
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [togglePlay]);
 
-  // Close modal on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setModalOpen(false);
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, []);
-
-  const selectQueueItem = (idx: number) => {
-    setQueueIdx(idx);
-    setProgress(0);
-    if (isPlaying) startPlay();
-  };
-
-  const toggleCardPlay = (id: number) => {
-    if (playingCardId === id) {
-      setPlayingCardId(null);
-      if (cardIntervalRef.current) clearInterval(cardIntervalRef.current);
-    } else {
-      setPlayingCardId(id);
-      if (cardIntervalRef.current) clearInterval(cardIntervalRef.current);
-      cardIntervalRef.current = setInterval(() => forceRender(n => n + 1), 600);
-    }
-  };
-
-  const handleFormSubmit = () => {
-    setFormSubmitted(true);
-    setTimeout(() => setModalOpen(false), 2000);
-  };
-
+  const selectQueue = (i: number) => { setQueueIdx(i); setProgress(0); if (isPlaying) startPlay(); };
+  const playedBars = Math.floor(progress * heroBars.length);
   const elapsed = Math.floor(progress * 163);
-  const timeDisplay = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")} / 2:43`;
-  const playedBars = Math.floor(progress * 60);
+  const timeDisplay = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")} / ${current.duration}`;
 
-  const filteredTracks = activeFilter === "all"
-    ? TRACKS
-    : TRACKS.filter(t => t.genre === activeFilter);
+  const handleTrack = (id: number) => setActiveTrack((cur) => (cur === id ? null : id));
+  const handleSubmit = () => { setFormSubmitted(true); setTimeout(() => { setModalOpen(false); setFormSubmitted(false); }, 2200); };
+
+  const filtered = activeFilter === "all" ? TRACKS : TRACKS.filter((t) => t.genre === activeFilter);
 
   return (
     <>
       {/* ── NAV ── */}
-      <nav style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-        padding: "0 24px",
-        background: "rgba(8,11,20,0.85)",
-        backdropFilter: "blur(20px)",
-        borderBottom: "1px solid var(--border)",
-      }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 8,
-              background: "linear-gradient(135deg, #5723fc, #8b5cf6)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 16, flexShrink: 0,
-            }}>🎵</div>
-            <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
-              Sonoris
+      <nav className={`zl-nav${scrolled ? " is-scrolled" : ""}`}>
+        <div className="zl-wrap zl-nav__inner">
+          <a href="/" className="zl-brand">
+            <span className="zl-brand__mark">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="#fff"><path d="M12 3v10.55A4 4 0 1014 17V7h4V3z" /></svg>
             </span>
+            <span className="zl-brand__name">Sonoris</span>
           </a>
 
-          <ul style={{ display: "flex", gap: 28, listStyle: "none" }} className="hidden md:flex">
-            <li><a href="#catalog" style={{ color: "var(--text-secondary)", textDecoration: "none", fontSize: "0.9rem", fontWeight: 500 }}>Catálogo</a></li>
-            <li><a href="#license" style={{ color: "var(--text-secondary)", textDecoration: "none", fontSize: "0.9rem", fontWeight: 500 }}>Colecciones</a></li>
-            <li><a href="#pricing" style={{ color: "var(--text-secondary)", textDecoration: "none", fontSize: "0.9rem", fontWeight: 500 }}>Precios</a></li>
+          <ul className="zl-nav__links zl-hide-md">
+            <li><a href="#featured" className="zl-nav__link">Descubrir</a></li>
+            <li><a href="#genres" className="zl-nav__link">Géneros</a></li>
+            <li><a href="#moods" className="zl-nav__link">Moods</a></li>
+            <li><a href="#license" className="zl-nav__link">Licencias</a></li>
+            <li><a href="#pricing" className="zl-nav__link">Precios</a></li>
           </ul>
 
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <button onClick={() => setModalOpen(true)} style={{
-              background: "transparent", border: "none", color: "var(--text-secondary)",
-              fontFamily: "inherit", fontWeight: 700, fontSize: "0.875rem",
-              cursor: "pointer", padding: "9px 20px", borderRadius: 8,
-            }}>Iniciar sesión</button>
-            <button onClick={() => setModalOpen(true)} style={{
-              background: "var(--amber)", border: "none", color: "#080b14",
-              fontFamily: "inherit", fontWeight: 700, fontSize: "0.875rem",
-              cursor: "pointer", padding: "9px 20px", borderRadius: 8,
-              transition: "all 0.2s",
-            }}>Empezar gratis</button>
+          <div className="zl-nav__actions">
+            <button className="zl-nav__login zl-hide-md" onClick={() => setModalOpen(true)}>Iniciar sesión</button>
+            <button className="zl-btn zl-btn--primary zl-btn--sm" onClick={() => setModalOpen(true)}>Empezar gratis</button>
           </div>
         </div>
       </nav>
 
       {/* ── HERO ── */}
-      <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", padding: "80px 24px 60px", position: "relative", zIndex: 1 }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center", width: "100%" }}
-          className="hero-grid">
-
-          {/* Left */}
-          <div>
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: 8,
-              padding: "6px 14px", marginBottom: 28,
-              background: "var(--amber-dim)",
-              border: "1px solid rgba(245,166,35,0.25)", borderRadius: 100,
-            }}>
-              <div style={{
-                width: 6, height: 6, background: "var(--amber)", borderRadius: "50%",
-                animation: "pulse-dot 2s ease-in-out infinite",
-              }} />
-              <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--amber)", letterSpacing: "0.04em" }}>
-                150+ tracks · nuevas pistas cada semana
-              </span>
-            </div>
-
-            <h1 className="display">
-              Música para<br /><em>historias reales.</em>
+      <header className="zl-section" style={{ paddingTop: 152, paddingBottom: 72 }}>
+        <div className="zl-wrap" style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 64, alignItems: "center" }}>
+          <div data-reveal>
+            <span className="zl-badge" style={{ marginBottom: 26 }}>
+              <span className="zl-pulse" style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--lime)" }} />
+              150+ tracks · curación humana cada semana
+            </span>
+            <h1 className="zl-display">
+              Música para<br />lo que estás <em>creando.</em>
             </h1>
-
-            <p style={{ fontSize: "1.15rem", color: "var(--text-secondary)", margin: "20px 0 36px", maxWidth: 480, lineHeight: 1.65 }}>
-              Música cinematográfica, editorial y ambient creada con IA y curada a mano.
-              Para video, podcast, iglesias y marcas.
-              Descarga con confianza — cada track incluye licencia lista para usar.
+            <p className="zl-lead" style={{ margin: "26px 0 34px", maxWidth: 480 }}>
+              Una plataforma de descubrimiento musical para video, podcast, iglesias y marcas.
+              Curada a mano, cinematográfica, lista para publicar — con licencia incluida en cada descarga.
             </p>
-
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <button onClick={() => setModalOpen(true)} style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                padding: "13px 28px", borderRadius: 14,
-                background: "var(--amber)", border: "none", color: "#080b14",
-                fontFamily: "inherit", fontWeight: 700, fontSize: "0.95rem",
-                cursor: "pointer", transition: "all 0.2s",
-              }}>Explorar el catálogo →</button>
-              <button
-                onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
-                style={{
-                  display: "inline-flex", alignItems: "center",
-                  padding: "13px 28px", borderRadius: 14,
-                  background: "transparent",
-                  border: "1px solid var(--border-glow)",
-                  color: "var(--text-secondary)",
-                  fontFamily: "inherit", fontWeight: 700, fontSize: "0.95rem",
-                  cursor: "pointer",
-                }}>Ver planes</button>
+              <button className="zl-btn zl-btn--primary" onClick={() => document.getElementById("featured")?.scrollIntoView({ behavior: "smooth" })}>
+                Explorar el catálogo <Arrow />
+              </button>
+              <button className="zl-btn zl-btn--ghost" onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}>
+                Ver planes
+              </button>
             </div>
-
-            <div style={{ marginTop: 40, display: "flex", alignItems: "center", gap: 20 }}>
-              <div style={{ display: "flex" }}>
-                {["🎬", "🎙️", "⛪", "📱"].map((e, i) => (
-                  <div key={i} style={{
-                    width: 32, height: 32, borderRadius: "50%",
-                    border: "2px solid var(--void)",
-                    marginLeft: i === 0 ? 0 : -8,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    background: "var(--surface)", fontSize: 14,
-                  }}>{e}</div>
-                ))}
-              </div>
-              <p style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
-                Usado por <strong style={{ color: "var(--text-secondary)" }}>videógrafos, podcasters, iglesias</strong> y agencias
-              </p>
+            <div style={{ marginTop: 44, display: "flex", gap: 40, flexWrap: "wrap" }}>
+              {[["150+", "Tracks curados"], ["6", "Colecciones"], ["∞", "Nuevas cada semana"]].map(([n, l]) => (
+                <div key={l}>
+                  <div style={{ fontSize: "1.7rem", fontWeight: 700, letterSpacing: "-0.03em" }}>{n}</div>
+                  <div style={{ fontSize: "0.78rem", color: "var(--text-3)", marginTop: 2 }}>{l}</div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Right — Player */}
-          <div style={{ position: "relative" }}>
-            <div style={{
-              background: "var(--deep)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-xl)",
-              padding: 28,
-              position: "relative",
-              overflow: "hidden",
-            }}>
-              {/* top glow line */}
-              <div style={{
-                position: "absolute", top: 0, left: 0, right: 0, height: 1,
-                background: "linear-gradient(90deg, transparent, rgba(87,35,252,0.5), transparent)",
-              }} />
-
-              {/* Header */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: "1rem", color: "var(--text-primary)" }}>
-                    {currentTrack.name}
-                  </div>
-                  <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: 4 }}>
-                    {currentTrack.meta}
-                  </div>
-                </div>
-                <div style={{
-                  padding: "4px 10px",
-                  background: "var(--purple-dim)",
-                  border: "1px solid rgba(87,35,252,0.2)",
-                  borderRadius: 100, fontSize: "0.72rem", fontWeight: 600, color: "#a78bfa",
-                }}>
-                  {currentTrack.tag} Cinematic
+          {/* Featured player */}
+          <div data-reveal>
+            <div className="zl-card" style={{ padding: 24, position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(110,59,255,0.6), transparent)" }} />
+              <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 20 }}>
+                <div style={{ width: 64, height: 64 }}><Cover variant={current.cover} glyph={current.glyph} radius={14} /></div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "0.7rem", color: "var(--text-3)", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600 }}>Sonando ahora</div>
+                  <div style={{ fontSize: "1.05rem", fontWeight: 700, marginTop: 4 }}>{current.name}</div>
+                  <div style={{ fontSize: "0.82rem", color: "var(--text-2)", marginTop: 2 }}>{current.artist} · {current.bpm} BPM</div>
                 </div>
               </div>
 
-              {/* Waveform */}
-              <div
-                onClick={togglePlay}
-                style={{ display: "flex", alignItems: "center", gap: 3, height: 80, margin: "16px 0", cursor: "pointer" }}
-                role="button"
-                aria-label={isPlaying ? "Pausar" : "Reproducir"}
-              >
-                {waveBars.map((h, i) => (
-                  <div key={i} style={{
-                    flex: 1, height: h, borderRadius: 2,
-                    background: i < playedBars - 1
-                      ? "linear-gradient(180deg, #5723fc, #8b5cf6)"
-                      : i === playedBars
-                        ? "var(--amber)"
-                        : "var(--border-glow)",
-                    animation: i === playedBars && isPlaying ? "wave-active 0.4s ease-in-out infinite alternate" : "none",
+              <div className="zl-wave" onClick={togglePlay} role="button" aria-label={isPlaying ? "Pausar" : "Reproducir"}>
+                {heroBars.map((h, i) => (
+                  <span key={i} style={{
+                    height: h,
+                    background: i < playedBars ? "linear-gradient(180deg, var(--purple-2), var(--purple))"
+                      : i === playedBars ? "var(--lime)" : "rgba(255,255,255,0.12)",
+                    transform: i === playedBars && isPlaying ? "scaleY(1.2)" : "none",
+                    animation: i === playedBars && isPlaying ? "zl-eq 0.45s ease-in-out infinite alternate" : "none",
                   }} />
                 ))}
               </div>
 
-              {/* Controls */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <button onClick={togglePlay} style={{
-                    width: 44, height: 44, borderRadius: "50%",
-                    background: "var(--purple)", border: "none",
-                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                    transition: "all 0.2s",
-                  }}
-                    aria-label={isPlaying ? "Pausar" : "Reproducir"}>
-                    <PlayIcon playing={isPlaying} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <button className="zl-iconbtn zl-play-main" onClick={togglePlay} aria-label={isPlaying ? "Pausar" : "Reproducir"}>
+                    {isPlaying ? <Pause /> : <Play />}
                   </button>
-                  <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", minWidth: 72 }}>
-                    {timeDisplay}
-                  </span>
+                  <span style={{ fontSize: "0.8rem", color: "var(--text-3)", fontVariantNumeric: "tabular-nums" }}>{timeDisplay}</span>
                 </div>
-                <button onClick={() => setModalOpen(true)} style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "7px 14px",
-                  background: "var(--amber-dim)",
-                  border: "1px solid rgba(245,166,35,0.2)",
-                  borderRadius: 8, fontSize: "0.78rem", fontWeight: 600,
-                  color: "var(--amber)", cursor: "pointer",
-                  fontFamily: "inherit",
-                }}>🔒 Descargar</button>
+                <button className="zl-btn zl-btn--lime zl-btn--sm" onClick={() => setModalOpen(true)}>Descargar</button>
               </div>
 
-              {/* Queue */}
-              <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 8 }}>
-                {HERO_QUEUE.map((t, i) => (
-                  <div key={i} onClick={() => selectQueueItem(i)} style={{
-                    display: "flex", alignItems: "center", gap: 12,
-                    padding: "10px 14px", borderRadius: 8, cursor: "pointer",
-                    background: i === queueIdx ? "var(--purple-dim)" : "transparent",
-                    border: `1px solid ${i === queueIdx ? "rgba(87,35,252,0.2)" : "transparent"}`,
-                    transition: "all 0.15s",
-                  }}
-                    role="button"
-                    aria-label={`Reproducir ${t.name}`}>
-                    <div style={{
-                      fontSize: "0.75rem",
-                      color: i === queueIdx ? "var(--amber)" : "var(--text-muted)",
-                      width: 18, textAlign: "center", flexShrink: 0,
-                    }}>
-                      {i === queueIdx && isPlaying ? "▶" : i + 1}
-                    </div>
+              <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 6 }}>
+                {heroQueue.map((t, i) => (
+                  <div key={t.id} className={`zl-queue-item${i === queueIdx ? " is-active" : ""}`} onClick={() => selectQueue(i)} role="button" aria-label={`Reproducir ${t.name}`}>
+                    <span style={{ width: 16, textAlign: "center", fontSize: "0.75rem", color: i === queueIdx ? "var(--lime)" : "var(--text-3)" }}>
+                      {i === queueIdx && isPlaying ? "♪" : i + 1}
+                    </span>
+                    <div style={{ width: 34, height: 34 }}><Cover variant={t.cover} radius={8} /></div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {t.tag} {t.name}
-                      </div>
-                      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{t.meta}</div>
+                      <div style={{ fontSize: "0.85rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</div>
+                      <div style={{ fontSize: "0.72rem", color: "var(--text-3)" }}>{t.artist}</div>
                     </div>
-                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", flexShrink: 0 }}>{t.duration}</div>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-3)", fontVariantNumeric: "tabular-nums" }}>{t.duration}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
         </div>
-      </section>
+      </header>
 
-      {/* ── TRUST BAR ── */}
-      <div style={{ padding: "28px 24px", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", position: "relative", zIndex: 1 }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 48, flexWrap: "wrap" }}>
-          {[
-            { icon: "⚡", text: "Curación humana · sin loops, sin artefactos" },
-            { icon: "🎵", text: "Cinematic · Lo-fi · Worship · Corporate · Podcast" },
-            { icon: "✅", text: "Licencia incluida en cada descarga" },
-            { icon: "↩️", text: "Cancela cuando quieras" },
-          ].map((item, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-muted)", fontSize: "0.82rem", fontWeight: 500 }}>
-              <span style={{ color: "#4ade80" }}>{item.icon}</span>
-              {item.text}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── CATALOG ── */}
-      <section id="catalog" style={{ padding: "100px 24px", position: "relative", zIndex: 1 }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 56 }}>
-            <span className="label-tag" style={{ display: "block", marginBottom: 12 }}>Escucha antes de decidir</span>
-            <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 16 }}>
-              Música hecha para proyectos reales
-            </h2>
-            <p style={{ color: "var(--text-secondary)", maxWidth: 520, margin: "0 auto", fontSize: "1rem" }}>
-              Cada pista fue escuchada y aprobada por productores con criterio editorial.
-              Si no le pondríamos a un proyecto de cliente, no está en el catálogo.{" "}
-              <strong style={{ color: "var(--text-primary)" }}>Nuevas pistas cada semana.</strong>
-            </p>
-          </div>
-
-          {/* Filters */}
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 40 }}>
-            {[
-              { label: "Todo", value: "all" },
-              { label: "Cinematic", value: "cinematic" },
-              { label: "Documentary", value: "corporate" },
-              { label: "Real Estate", value: "lofi" },
-              { label: "Worship", value: "worship" },
-              { label: "Social Media", value: "social" },
-              { label: "Podcast", value: "podcast" },
-              { label: "Corporate", value: "corporate" },
-            ].map((f, i) => (
-              <button key={i} onClick={() => setActiveFilter(f.value)} style={{
-                padding: "7px 18px", borderRadius: 100,
-                border: `1px solid ${activeFilter === f.value ? "rgba(87,35,252,0.35)" : "var(--border)"}`,
-                background: activeFilter === f.value ? "var(--purple-dim)" : "transparent",
-                color: activeFilter === f.value ? "#a78bfa" : "var(--text-secondary)",
-                fontFamily: "inherit", fontSize: "0.82rem", fontWeight: 500,
-                cursor: "pointer", transition: "all 0.15s",
-              }}>{f.label}</button>
+      {/* ── FEATURED RELEASES ── */}
+      <section id="featured" className="zl-section zl-section--tight">
+        <div className="zl-wrap">
+          <SectionHeader eyebrow="Lanzamientos destacados" title="Estrenos de la semana" desc="Lo nuevo, escogido a mano por nuestro equipo de curación." action="Ver todo" />
+          <div className="zl-rail" data-reveal>
+            {FEATURED.map((t) => (
+              <button key={t.id} className="zl-release" onClick={() => handleTrack(t.id)} aria-label={`Reproducir ${t.name}`}>
+                <Cover variant={t.cover} glyph={t.glyph} />
+                <span className="zl-release__play"><Play size={18} /></span>
+                <div className="zl-release__title">{t.name}</div>
+                <div className="zl-release__meta">{t.artist} · {t.mood}</div>
+              </button>
             ))}
           </div>
+        </div>
+      </section>
 
-          {/* Track Grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
-            {filteredTracks.map(track => {
-              const isCardPlaying = playingCardId === track.id;
-              const miniBarHeights = randomBars(24);
+      {/* ── TRENDING TRACKS ── */}
+      <section className="zl-section zl-section--tight">
+        <div className="zl-wrap">
+          <SectionHeader eyebrow="En tendencia" title="Lo más sonado ahora" desc="Los tracks que más se están descargando esta semana." action="Explorar catálogo" />
+          <div className="zl-tracks" data-reveal>
+            {TRENDING.map((t, i) => {
+              const playing = activeTrack === t.id;
               return (
-                <div key={track.id} onClick={() => toggleCardPlay(track.id)} style={{
-                  background: isCardPlaying
-                    ? "linear-gradient(135deg, var(--deep), rgba(87,35,252,0.06))"
-                    : "var(--deep)",
-                  border: `1px solid ${isCardPlaying ? "rgba(87,35,252,0.4)" : "var(--border)"}`,
-                  borderRadius: "var(--radius-lg)",
-                  padding: 20, cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-                  role="button"
-                  aria-label={`${isCardPlaying ? "Pausar" : "Reproducir"} ${track.name}`}>
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
-                    <div style={{
-                      width: 48, height: 48, borderRadius: 10,
-                      background: CARD_GRADIENTS[track.genre] || CARD_GRADIENTS.cinematic,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 22, flexShrink: 0,
-                    }}>{track.emoji}</div>
-                    <div style={{
-                      width: 36, height: 36, borderRadius: "50%",
-                      background: "var(--surface)",
-                      border: "1px solid var(--border-glow)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", color: "var(--text-secondary)",
-                    }}>
-                      <SmallPlayIcon playing={isCardPlaying} />
-                    </div>
-                  </div>
-
-                  <div style={{ fontWeight: 700, fontSize: "0.92rem", color: "var(--text-primary)", marginBottom: 8 }}>
-                    {track.name}
-                  </div>
-
-                  <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-                    {[`🎵 ${track.bpm} BPM`, `⏱ ${track.duration}`, `🎼 ${track.key}`].map((m, i) => (
-                      <span key={i} style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{m}</span>
-                    ))}
-                  </div>
-
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                    {[track.mood, ...track.tags].map((tag, i) => (
-                      <span key={i} style={{
-                        padding: "3px 9px", borderRadius: 100,
-                        fontSize: "0.68rem", fontWeight: 500,
-                        background: "var(--surface)",
-                        color: "var(--text-muted)",
-                        border: "1px solid var(--border)",
-                      }}>{tag}</span>
-                    ))}
-                  </div>
-
-                  {/* Mini waveform */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 2, marginTop: 14, height: 28 }}>
-                    {miniBarHeights.map((h, i) => (
-                      <div key={i} style={{
-                        flex: 1, height: h, borderRadius: 1,
-                        background: isCardPlaying
-                          ? (i % 3 === 0 ? "var(--purple)" : "rgba(87,35,252,0.4)")
-                          : "var(--border-glow)",
-                      }} />
-                    ))}
-                  </div>
-                </div>
+                <button key={t.id} className={`zl-track${playing ? " is-playing" : ""}`} onClick={() => handleTrack(t.id)} aria-label={`Reproducir ${t.name}`}>
+                  <span className="zl-track__rank">{playing ? <Play size={13} /> : i + 1}</span>
+                  <span className="zl-track__cover"><Cover variant={t.cover} glyph={t.glyph} radius={10} /></span>
+                  <span style={{ minWidth: 0 }}>
+                    <span className="zl-track__title" style={{ display: "block" }}>{t.name}</span>
+                    <span className="zl-track__meta" style={{ display: "block" }}>{t.artist} · {t.bpm} BPM · {t.mood}</span>
+                  </span>
+                  <span className="zl-track__dur">{t.duration}</span>
+                </button>
               );
             })}
           </div>
         </div>
       </section>
 
-      {/* ── CERTIFICATE SECTION ── */}
-      <section id="license" style={{
-        padding: "100px 24px",
-        background: "linear-gradient(180deg, transparent, rgba(87,35,252,0.04), transparent)",
-        position: "relative", zIndex: 1,
-      }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}
-          className="cert-grid">
-
-          {/* Certificate mockup */}
-          <div style={{ background: "var(--deep)", border: "1px solid var(--border)", borderRadius: "var(--radius-xl)", padding: 32, position: "relative", overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 24, paddingBottom: 20, borderBottom: "1px solid var(--border)" }}>
-              <span style={{ fontWeight: 700, fontSize: "1rem" }}>🎵 Sonoris</span>
-              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Certificado de Licencia</span>
-            </div>
-            {[
-              ["N° de Certificado", "SNR-2026-00847"],
-              ["Licenciatario", "Tu nombre aquí"],
-              ["Track", "Midnight Drive"],
-              ["ID de Track", "TRK-00291"],
-              ["Generado con", "Udio v3 (lic. activa)"],
-              ["Plan", "Creator"],
-              ["Fecha", "23 jun 2026"],
-            ].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid rgba(30,38,64,0.6)", fontSize: "0.82rem" }}>
-                <span style={{ color: "var(--text-muted)" }}>{k}</span>
-                <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{v}</span>
-              </div>
-            ))}
-            <div style={{ marginTop: 20, padding: 16, background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 8 }}>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#4ade80", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
-                Alcance de Licencia — Digital
-              </div>
-              {["YouTube y plataformas de video", "Instagram, TikTok, Facebook, X", "Podcast y contenido de audio", "Transmisiones en vivo"].map(item => (
-                <div key={item} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.8rem", color: "var(--text-secondary)", padding: "3px 0" }}>
-                  <span style={{ color: "#4ade80" }}>✓</span> {item}
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "8px 14px", background: "var(--amber-dim)",
-                border: "1px solid rgba(245,166,35,0.2)", borderRadius: 100,
-                fontSize: "0.75rem", fontWeight: 600, color: "var(--amber)",
-              }}>✦ Licencia Perpetua para proyectos publicados</span>
-            </div>
-          </div>
-
-          {/* Right text */}
-          <div>
-            <span className="label-tag" style={{ display: "block", marginBottom: 12 }}>Descarga con tranquilidad</span>
-            <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 16 }}>
-              Descarga hoy.<br />Publica mañana.<br />Sin preocupaciones.
-            </h2>
-            <p style={{ color: "var(--text-secondary)", lineHeight: 1.7, marginBottom: 28 }}>
-              Cada descarga incluye un certificado de licencia generado automáticamente.
-              Guárdalo en el expediente del proyecto. Si alguna vez necesitas demostrar
-              que la música está en orden, ya lo tienes.
-            </p>
-
-            {[
-              { icon: "📄", title: "Sale solo. Sin pedirlo.", desc: "Cada descarga genera su certificado automáticamente. Un PDF con todo lo que necesitas para el expediente del proyecto." },
-              { icon: "🔍", title: "Sabemos qué hay en cada pista", desc: "Qué herramienta la generó, cuándo, con qué acuerdos vigentes. Todo documentado. Nada a ciegas." },
-              { icon: "🛡️", title: "Lo que publicas queda tuyo", desc: "El contenido que subes mientras tienes plan activo sigue licenciado aunque canceles. Sin fecha de vencimiento para lo ya publicado." },
-            ].map(({ icon, title, desc }) => (
-              <div key={title} style={{ display: "flex", gap: 14, alignItems: "flex-start", marginBottom: 16 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 8,
-                  background: "var(--amber-dim)",
-                  border: "1px solid rgba(245,166,35,0.2)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 16, flexShrink: 0,
-                }}>{icon}</div>
-                <div>
-                  <h4 style={{ fontSize: "0.88rem", fontWeight: 700, marginBottom: 3 }}>{title}</h4>
-                  <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", lineHeight: 1.5 }}>{desc}</p>
+      {/* ── STAFF PICKS (editorial) ── */}
+      <section className="zl-section">
+        <div className="zl-wrap">
+          <SectionHeader eyebrow="Selección del equipo" title="Staff Picks" desc="Una pieza destacada y las que la acompañan, elegidas con criterio editorial." />
+          <div data-reveal style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 40, alignItems: "stretch" }} className="zl-staff-grid">
+            {/* Hero pick */}
+            <button className="zl-release" onClick={() => handleTrack(STAFF_HERO.id)} style={{ position: "relative" }} aria-label={`Reproducir ${STAFF_HERO.name}`}>
+              <div style={{ position: "relative", borderRadius: "var(--r-lg)", overflow: "hidden", aspectRatio: "16 / 11" }}>
+                <div style={{ position: "absolute", inset: 0, background: COVERS[STAFF_HERO.cover] }} />
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 35%, rgba(0,0,0,0.78))" }} />
+                <span className="zl-release__play" style={{ width: 56, height: 56 }}><Play size={22} /></span>
+                <div style={{ position: "absolute", left: 26, bottom: 24, right: 26 }}>
+                  <span className="zl-tag" style={{ marginBottom: 12, display: "inline-block" }}>Pick de la semana</span>
+                  <div style={{ fontSize: "1.7rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#fff" }}>{STAFF_HERO.name}</div>
+                  <div style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.75)", marginTop: 4 }}>{STAFF_HERO.artist} · {STAFF_HERO.bpm} BPM · {STAFF_HERO.duration}</div>
                 </div>
               </div>
-            ))}
+            </button>
 
-            <button onClick={() => document.getElementById("catalog")?.scrollIntoView({ behavior: "smooth" })} style={{
-              display: "inline-flex", alignItems: "center",
-              padding: "13px 28px", borderRadius: 14,
-              background: "var(--amber)", border: "none", color: "#080b14",
-              fontFamily: "inherit", fontWeight: 700, fontSize: "0.95rem",
-              cursor: "pointer", marginTop: 12,
-            }}>Explorar el catálogo →</button>
+            {/* Curator note + list */}
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div className="zl-card" style={{ padding: 22, marginBottom: 16 }}>
+                <p style={{ fontSize: "1.02rem", lineHeight: 1.6, color: "var(--text)", fontWeight: 500 }}>
+                  “Texturas cálidas y un crescendo que respira. Funciona igual de bien en un reel de bodas que en el cierre de un documental.”
+                </p>
+                <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg, var(--purple), var(--purple-2))" }} />
+                  <span style={{ fontSize: "0.82rem", color: "var(--text-2)" }}>Curado por <strong style={{ color: "var(--text)" }}>el equipo Sonoris</strong></span>
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {STAFF_LIST.map((t, i) => {
+                  const playing = activeTrack === t.id;
+                  return (
+                    <button key={t.id} className={`zl-track${playing ? " is-playing" : ""}`} onClick={() => handleTrack(t.id)} style={{ gridTemplateColumns: "26px 46px 1fr auto" }} aria-label={`Reproducir ${t.name}`}>
+                      <span className="zl-track__rank">{playing ? <Play size={12} /> : i + 1}</span>
+                      <span style={{ width: 46, height: 46 }}><Cover variant={t.cover} glyph={t.glyph} radius={9} /></span>
+                      <span style={{ minWidth: 0 }}>
+                        <span className="zl-track__title" style={{ display: "block" }}>{t.name}</span>
+                        <span className="zl-track__meta" style={{ display: "block" }}>{t.artist} · {t.mood}</span>
+                      </span>
+                      <span className="zl-track__dur">{t.duration}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ── */}
-      <section style={{ padding: "80px 24px", position: "relative", zIndex: 1 }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{
-            background: "var(--deep)", border: "1px solid var(--border)",
-            borderRadius: "var(--radius-xl)", padding: 48,
-            display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center",
-          }} className="ai-grid">
-            <div>
-              <span className="label-tag" style={{ display: "block", marginBottom: 12 }}>Cómo funciona Sonoris</span>
-              <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 16 }}>
-                Creada con IA.<br />Curada con criterio.
-              </h2>
-              <p style={{ color: "var(--text-secondary)", lineHeight: 1.7, marginBottom: 24 }}>
-                Cada pista pasa por dos filtros antes de llegar al catálogo: los algoritmos que la crean
-                y los oídos que la aprueban. Si no suena bien en un proyecto real, no entra.
-              </p>
-              <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-                {[
-                  { num: "150+", label: "Pistas en catálogo" },
-                  { num: "6", label: "Colecciones" },
-                  { num: "∞", label: "Nuevas cada semana" },
-                ].map(({ num, label }) => (
-                  <div key={label} style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "1.8rem", fontWeight: 700, letterSpacing: "-0.03em" }}>{num}</div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
+      {/* ── NEW MUSIC ── */}
+      <section className="zl-section zl-section--tight">
+        <div className="zl-wrap">
+          <SectionHeader eyebrow="Novedades" title="Recién añadido" desc="Pistas frescas que acaban de entrar al catálogo." action="Ver novedades" />
+          <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 24 }} className="zl-new-grid">
+            {NEW_MUSIC.map((t) => (
+              <button key={t.id} className="zl-release" onClick={() => handleTrack(t.id)} aria-label={`Reproducir ${t.name}`}>
+                <div style={{ position: "relative" }}>
+                  <Cover variant={t.cover} glyph={t.glyph} />
+                  <span className="zl-pill-new" style={{ position: "absolute", top: 12, left: 12 }}>Nuevo</span>
+                  <span className="zl-release__play"><Play size={18} /></span>
+                </div>
+                <div className="zl-release__title">{t.name}</div>
+                <div className="zl-release__meta">{t.artist} · {t.duration}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                { bg: "var(--purple-dim)", icon: "🎛️", title: "Herramientas con acuerdos formales", desc: "Trabajamos solo con plataformas de IA que tienen acuerdos vigentes con la industria musical. No improvisamos." },
-                { bg: "var(--amber-dim)", icon: "👂", title: "Cada pista pasa por oídos humanos", desc: "Antes de publicarse, un productor la escucha. Si hay loops, artefactos o algo que no suena profesional, no entra." },
-                { bg: "rgba(34,197,94,0.1)", icon: "📋", title: "Cada pista tiene su historia documentada", desc: "Herramienta, fecha, parámetros. Lo guardamos para que tú no tengas que preocuparte si alguien pregunta." },
-              ].map(({ bg, icon, title, desc }) => (
-                <div key={title} style={{
-                  display: "flex", alignItems: "center", gap: 14,
-                  padding: "14px 16px", background: "var(--surface)",
-                  border: "1px solid var(--border)", borderRadius: "var(--radius)",
-                }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 8, background: bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
-                    {icon}
+      {/* ── GENRE COLLECTIONS ── */}
+      <section id="genres" className="zl-section">
+        <div className="zl-wrap">
+          <SectionHeader eyebrow="Colecciones por género" title="Explora por estilo" desc="Del cine al culto, del lo-fi al corporativo. Encuentra el tono exacto de tu proyecto." />
+          <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 22 }} className="zl-coll-grid">
+            {GENRES.map((g) => (
+              <button key={g.name} className="zl-collection" aria-label={`Colección ${g.name}`}>
+                <div className="zl-collection__bg" style={{ background: COVERS[g.cover] }} />
+                <div className="zl-collection__shade" />
+                <div className="zl-collection__body">
+                  <span style={{ fontSize: "1.4rem" }}>{g.glyph}</span>
+                  <div style={{ marginTop: "auto" }}>
+                    <div className="zl-collection__name">{g.name}</div>
+                    <div className="zl-collection__count">{g.count} tracks</div>
                   </div>
-                  <div>
-                    <h4 style={{ fontSize: "0.85rem", fontWeight: 700, marginBottom: 2 }}>{title}</h4>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: 1.4 }}>{desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── MOOD COLLECTIONS ── */}
+      <section id="moods" className="zl-section zl-section--tight">
+        <div className="zl-wrap">
+          <SectionHeader eyebrow="Colecciones por mood" title="Encuentra el sentimiento" desc="A veces no buscas un género — buscas una emoción." />
+          <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 18 }} className="zl-mood-grid">
+            {MOODS.map((m) => (
+              <button key={m.name} className="zl-collection" style={{ aspectRatio: "3 / 4" }} aria-label={`Mood ${m.name}`}>
+                <div className="zl-collection__bg" style={{ background: COVERS[m.cover] }} />
+                <div className="zl-collection__shade" />
+                <div className="zl-collection__body" style={{ padding: 16 }}>
+                  <div style={{ marginTop: "auto" }}>
+                    <div className="zl-collection__name" style={{ fontSize: "1.05rem" }}>{m.name}</div>
+                    <div className="zl-collection__count">{m.count}</div>
                   </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CATALOG (filterable) ── */}
+      <section id="catalog" className="zl-section">
+        <div className="zl-wrap">
+          <SectionHeader eyebrow="Catálogo completo" title="Escucha antes de decidir" desc="Cada pista fue escuchada y aprobada por productores. Si no la pondríamos en un proyecto de cliente, no entra." />
+          <div data-reveal style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 28 }}>
+            {FILTERS.map((f) => (
+              <button key={f.value} className={`zl-chip${activeFilter === f.value ? " is-active" : ""}`} onClick={() => setActiveFilter(f.value)}>{f.label}</button>
+            ))}
+          </div>
+          <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 24 }}>
+            {filtered.map((t) => (
+              <button key={t.id} className="zl-release" onClick={() => handleTrack(t.id)} aria-label={`Reproducir ${t.name}`}>
+                <Cover variant={t.cover} glyph={t.glyph} />
+                <span className="zl-release__play"><Play size={18} /></span>
+                <div className="zl-release__title">{t.name}</div>
+                <div className="zl-release__meta">{t.artist} · {t.bpm} BPM · {t.duration}</div>
+                <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                  <span className="zl-tag">{t.mood}</span>
+                  <span className="zl-tag">{t.genre}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── LICENSE / CERTIFICATE ── */}
+      <section id="license" className="zl-section">
+        <div className="zl-wrap" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56, alignItems: "center" }}>
+          <div className="zl-card" data-reveal style={{ padding: 30 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: 18, marginBottom: 18, borderBottom: "1px solid var(--border)" }}>
+              <span style={{ fontWeight: 700 }}>Sonoris</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--text-3)" }}>Certificado de Licencia</span>
+            </div>
+            {[
+              ["N° de Certificado", "SNR-2026-00847"],
+              ["Track", "Midnight Drive"],
+              ["ID de Track", "TRK-00291"],
+              ["Plan", "Creator"],
+              ["Fecha", "23 jun 2026"],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--border)", fontSize: "0.84rem" }}>
+                <span style={{ color: "var(--text-3)" }}>{k}</span>
+                <span style={{ fontWeight: 500 }}>{v}</span>
+              </div>
+            ))}
+            <div style={{ marginTop: 18, padding: 16, background: "var(--lime-dim)", border: "1px solid rgba(205,255,79,0.25)", borderRadius: "var(--r-sm)" }}>
+              <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--lime)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Alcance de Licencia</div>
+              {["YouTube y plataformas de video", "Instagram, TikTok, Facebook, X", "Podcast y audio", "Transmisiones en vivo"].map((it) => (
+                <div key={it} style={{ display: "flex", gap: 8, fontSize: "0.82rem", color: "var(--text-2)", padding: "3px 0" }}>
+                  <span style={{ color: "var(--lime)" }}>✓</span> {it}
                 </div>
               ))}
             </div>
+          </div>
+
+          <div data-reveal>
+            <span className="zl-eyebrow">Descarga con tranquilidad</span>
+            <h2 className="zl-h2" style={{ margin: "12px 0 18px" }}>Descarga hoy.<br />Publica mañana.<br />Sin preocupaciones.</h2>
+            <p className="zl-muted" style={{ lineHeight: 1.7, marginBottom: 28 }}>
+              Cada descarga incluye un certificado de licencia generado automáticamente.
+              Guárdalo en el expediente del proyecto: si alguna vez necesitas demostrar que la música está en orden, ya lo tienes.
+            </p>
+            {[
+              ["Sale solo, sin pedirlo", "Cada descarga genera su certificado en PDF, con todo lo que necesitas para el expediente."],
+              ["Sabemos qué hay en cada pista", "Qué herramienta la generó, cuándo y con qué acuerdos vigentes. Todo documentado."],
+              ["Lo que publicas queda tuyo", "El contenido que subes con plan activo sigue licenciado aunque canceles. Sin fecha de vencimiento."],
+            ].map(([title, desc]) => (
+              <div key={title} style={{ display: "flex", gap: 14, marginBottom: 16 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--purple-2)", marginTop: 7, flexShrink: 0 }} />
+                <div>
+                  <h4 style={{ fontSize: "0.92rem", fontWeight: 700, marginBottom: 3 }}>{title}</h4>
+                  <p style={{ fontSize: "0.84rem", color: "var(--text-2)", lineHeight: 1.55 }}>{desc}</p>
+                </div>
+              </div>
+            ))}
+            <button className="zl-btn zl-btn--primary" style={{ marginTop: 10 }} onClick={() => document.getElementById("catalog")?.scrollIntoView({ behavior: "smooth" })}>
+              Explorar el catálogo <Arrow />
+            </button>
           </div>
         </div>
       </section>
 
       {/* ── PRICING ── */}
-      <section id="pricing" style={{ padding: "100px 24px", position: "relative", zIndex: 1 }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <span className="label-tag" style={{ display: "block", marginBottom: 12 }}>Precios</span>
-            <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 16 }}>Elige tu plan</h2>
-            <p style={{ color: "var(--text-secondary)" }}>Empieza gratis. Escucha todo el catálogo antes de decidir.</p>
+      <section id="pricing" className="zl-section">
+        <div className="zl-wrap">
+          <div data-reveal style={{ textAlign: "center", marginBottom: 44, maxWidth: 560, marginLeft: "auto", marginRight: "auto" }}>
+            <span className="zl-eyebrow">Precios</span>
+            <h2 className="zl-h2" style={{ margin: "12px 0 14px" }}>Elige tu plan</h2>
+            <p className="zl-muted">Empieza gratis. Escucha todo el catálogo antes de decidir.</p>
           </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }} className="pricing-grid">
+          <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18 }} className="zl-pricing-grid">
             {[
-              {
-                tier: "Free", color: "var(--text-muted)", price: "$0", period: "/mes", yearly: "\u00a0",
-                desc: "Escucha el catálogo completo sin compromiso. Sin tarjeta de crédito.",
-                features: [
-                  { ok: true, text: "Preview de 30 seg de todos los tracks" },
-                  { ok: false, text: "Descarga de tracks" },
-                  { ok: false, text: "Certificado de licencia" },
-                  { ok: false, text: "Uso comercial" },
-                ],
-                cta: "Explorar gratis", ctaStyle: "outline", featured: false,
-              },
-              {
-                tier: "Creator", color: "#a78bfa", price: "$9", period: "/mes",
-                yearly: "$7/mes con plan anual · ahorra $24",
-                desc: "Para creadores que publican contenido de forma regular y necesitan música nueva constantemente.",
-                features: [
-                  { ok: true, text: "Catálogo completo en MP3" },
-                  { ok: true, text: "Descargas ilimitadas" },
-                  { ok: true, text: "Certificado de licencia PDF" },
-                  { ok: true, text: "YouTube, Podcast, RRSS" },
-                  { ok: false, text: "Descarga en WAV (lossless)" },
-                  { ok: false, text: "Anuncios digitales pagados" },
-                ],
-                cta: "Empezar con Creator", ctaStyle: "primary", featured: true,
-              },
-              {
-                tier: "Pro", color: "var(--amber)", price: "$19", period: "/mes",
-                yearly: "$15/mes con plan anual · ahorra $48",
-                desc: "Para videógrafos y agencias que entregan proyectos a clientes y necesitan calidad lossless sin negociar.",
-                features: [
-                  { ok: true, text: "Todo lo de Creator" },
-                  { ok: true, text: "Descarga en WAV (lossless)" },
-                  { ok: true, text: "Licencia Comercial completa" },
-                  { ok: true, text: "Anuncios digitales pagados" },
-                  { ok: true, text: "Videos corporativos y apps" },
-                  { ok: true, text: "Prioridad en nuevos tracks" },
-                ],
-                cta: "Empezar con Pro", ctaStyle: "outline", featured: false,
-              },
-              {
-                tier: "Iglesias / ONGs", color: "var(--green)", price: "$5", period: "/mes",
-                yearly: "Plan exclusivo para uso no comercial",
-                desc: "Para iglesias y ministerios que producen contenido de culto y necesitan música para sus plataformas digitales.",
-                features: [
-                  { ok: true, text: "Catálogo completo en MP3" },
-                  { ok: true, text: "Descargas ilimitadas" },
-                  { ok: true, text: "Certificado de licencia" },
-                  { ok: true, text: "Cultos, eventos, streaming" },
-                  { ok: false, text: "Uso comercial o publicitario" },
-                  { ok: false, text: "WAV o licencia broadcast" },
-                ],
-                cta: "Plan para iglesias", ctaStyle: "amber", featured: false,
-              },
-            ].map(plan => (
-              <div key={plan.tier} style={{
-                background: plan.featured
-                  ? "linear-gradient(160deg, var(--deep), rgba(87,35,252,0.08))"
-                  : "var(--deep)",
-                border: `1px solid ${plan.featured ? "rgba(87,35,252,0.4)" : "var(--border)"}`,
-                borderRadius: "var(--radius-lg)",
-                padding: "28px 24px",
-                display: "flex", flexDirection: "column",
-                position: "relative", overflow: "hidden",
-              }}>
-                {plan.featured && (
-                  <>
-                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, var(--purple), #8b5cf6)" }} />
-                    <div style={{ position: "absolute", top: -1, right: 20, padding: "4px 12px", background: "var(--purple)", borderRadius: "0 0 8px 8px", fontSize: "0.68rem", fontWeight: 700, color: "#fff", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                      POPULAR
-                    </div>
-                  </>
-                )}
-                <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: plan.color, marginBottom: 16 }}>
-                  {plan.tier}
+              { tier: "Free", color: "var(--text-3)", price: "$0", period: "/mes", note: " ", desc: "Escucha el catálogo completo sin compromiso. Sin tarjeta.", cta: "Explorar gratis", style: "ghost", featured: false,
+                features: [[true, "Preview de 30s de todo"], [false, "Descarga de tracks"], [false, "Certificado de licencia"], [false, "Uso comercial"]] },
+              { tier: "Creator", color: "var(--purple-2)", price: "$9", period: "/mes", note: "$7/mes anual · ahorra $24", desc: "Para creadores que publican de forma regular y necesitan música nueva constante.", cta: "Empezar con Creator", style: "primary", featured: true,
+                features: [[true, "Catálogo completo en MP3"], [true, "Descargas ilimitadas"], [true, "Certificado de licencia PDF"], [true, "YouTube, Podcast, RRSS"], [false, "WAV lossless"], [false, "Anuncios pagados"]] },
+              { tier: "Pro", color: "var(--orange)", price: "$19", period: "/mes", note: "$15/mes anual · ahorra $48", desc: "Para videógrafos y agencias que entregan a clientes y necesitan lossless.", cta: "Empezar con Pro", style: "ghost", featured: false,
+                features: [[true, "Todo lo de Creator"], [true, "WAV lossless"], [true, "Licencia comercial completa"], [true, "Anuncios digitales pagados"], [true, "Videos corporativos y apps"], [true, "Prioridad en nuevos tracks"]] },
+              { tier: "Iglesias / ONGs", color: "var(--lime)", price: "$5", period: "/mes", note: "Exclusivo uso no comercial", desc: "Para iglesias y ministerios que producen contenido de culto.", cta: "Plan para iglesias", style: "lime", featured: false,
+                features: [[true, "Catálogo completo en MP3"], [true, "Descargas ilimitadas"], [true, "Certificado de licencia"], [true, "Cultos, eventos, streaming"], [false, "Uso comercial"], [false, "WAV o broadcast"]] },
+            ].map((p) => (
+              <div key={p.tier} className={`zl-plan${p.featured ? " is-featured" : ""}`}>
+                {p.featured && <span style={{ position: "absolute", top: 14, right: 14 }} className="zl-pill-new">Popular</span>}
+                <div style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: p.color, marginBottom: 14 }}>{p.tier}</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                  <span style={{ fontSize: "2.5rem", fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1 }}>{p.price}</span>
+                  <span style={{ fontSize: "0.85rem", color: "var(--text-3)" }}>{p.period}</span>
                 </div>
-                <div style={{ marginBottom: 6 }}>
-                  <span style={{ fontSize: "2.4rem", fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1 }}>{plan.price}</span>
-                  <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{plan.period}</span>
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "var(--green)", marginBottom: 20, minHeight: 20 }}>{plan.yearly}</div>
-                <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginBottom: 24, lineHeight: 1.55, flex: 1 }}>{plan.desc}</p>
-                <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 9, marginBottom: 24 }}>
-                  {plan.features.map((f, i) => (
-                    <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 9, fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                      <span style={{ color: f.ok ? "var(--green)" : "var(--text-muted)", marginTop: 1, flexShrink: 0 }}>{f.ok ? "✓" : "✗"}</span>
-                      {f.text}
+                <div style={{ fontSize: "0.74rem", color: "var(--lime)", margin: "8px 0 18px", minHeight: 18 }}>{p.note}</div>
+                <p style={{ fontSize: "0.84rem", color: "var(--text-2)", lineHeight: 1.55, marginBottom: 22, flex: 1 }}>{p.desc}</p>
+                <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 9, marginBottom: 22 }}>
+                  {p.features.map(([ok, text], i) => (
+                    <li key={i} style={{ display: "flex", gap: 9, fontSize: "0.82rem", color: ok ? "var(--text-2)" : "var(--text-3)" }}>
+                      <span style={{ color: ok ? "var(--lime)" : "var(--text-3)", flexShrink: 0 }}>{ok ? "✓" : "✕"}</span>{text as string}
                     </li>
                   ))}
                 </ul>
-                <button onClick={() => setModalOpen(true)} style={{
-                  width: "100%", padding: 11, borderRadius: 8,
-                  fontFamily: "inherit", fontWeight: 700, fontSize: "0.875rem",
-                  cursor: "pointer",
-                  background: plan.ctaStyle === "primary" ? "var(--purple)"
-                    : plan.ctaStyle === "amber" ? "var(--amber-dim)"
-                      : "transparent",
-                  color: plan.ctaStyle === "primary" ? "#fff"
-                    : plan.ctaStyle === "amber" ? "var(--amber)"
-                      : "var(--text-secondary)",
-                  border: plan.ctaStyle === "outline" ? "1px solid var(--border-glow)"
-                    : plan.ctaStyle === "amber" ? "1px solid rgba(245,166,35,0.25)"
-                      : "none",
-                }}>
-                  {plan.cta}
-                </button>
+                <button
+                  className={`zl-btn zl-btn--block ${p.style === "primary" ? "zl-btn--primary" : p.style === "lime" ? "zl-btn--lime" : "zl-btn--ghost"}`}
+                  onClick={() => setModalOpen(true)}
+                >{p.cta}</button>
               </div>
             ))}
           </div>
-
-          <p style={{ textAlign: "center", marginTop: 28, fontSize: "0.82rem", color: "var(--text-muted)" }}>
-            Todo lo que publicas con tu plan activo queda licenciado para siempre · Cancela cuando quieras · Sin contratos anuales obligatorios
+          <p style={{ textAlign: "center", marginTop: 26, fontSize: "0.82rem", color: "var(--text-3)" }}>
+            Todo lo que publicas con tu plan activo queda licenciado para siempre · Cancela cuando quieras
           </p>
         </div>
       </section>
 
       {/* ── FOOTER ── */}
-      <footer style={{ borderTop: "1px solid var(--border)", padding: "40px 24px", position: "relative", zIndex: 1 }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
-          <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #5723fc, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🎵</div>
-            <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-primary)" }}>Sonoris</span>
+      <footer style={{ borderTop: "1px solid var(--border)", padding: "44px 0", position: "relative", zIndex: 1 }}>
+        <div className="zl-wrap" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
+          <a href="/" className="zl-brand">
+            <span className="zl-brand__mark">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="#fff"><path d="M12 3v10.55A4 4 0 1014 17V7h4V3z" /></svg>
+            </span>
+            <span className="zl-brand__name">Sonoris</span>
           </a>
-          <ul style={{ display: "flex", gap: 24, listStyle: "none" }}>
-            {[["Términos de licencia", "#"], ["Privacidad", "#"], ["Términos de uso", "#"], ["Contacto", "#"]].map(([label, href]) => (
-              <li key={label}><a href={href} style={{ fontSize: "0.8rem", color: "var(--text-muted)", textDecoration: "none" }}>{label}</a></li>
+          <ul style={{ display: "flex", gap: 24, listStyle: "none", flexWrap: "wrap" }}>
+            {["Términos de licencia", "Privacidad", "Términos de uso", "Contacto"].map((l) => (
+              <li key={l}><a href="#" className="zl-foot-link">{l}</a></li>
             ))}
           </ul>
-          <p style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-            © 2026 Sonoris · JM Creativos LLC · Puerto Rico
-          </p>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-3)" }}>© 2026 Sonoris · JM Creativos LLC · Puerto Rico</p>
         </div>
       </footer>
 
       {/* ── MODAL ── */}
       {modalOpen && (
-        <div
-          onClick={e => { if (e.target === e.currentTarget) setModalOpen(false); }}
-          style={{
-            position: "fixed", inset: 0, background: "rgba(8,11,20,0.85)",
-            backdropFilter: "blur(8px)", zIndex: 200,
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-          }}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Registro"
-        >
-          <div style={{
-            background: "var(--deep)", border: "1px solid var(--border-glow)",
-            borderRadius: "var(--radius-xl)", padding: 40, maxWidth: 440, width: "100%",
-            position: "relative",
-          }}>
-            <button onClick={() => setModalOpen(false)} style={{
-              position: "absolute", top: 16, right: 16,
-              background: "var(--surface)", border: "none",
-              color: "var(--text-muted)", width: 30, height: 30,
-              borderRadius: "50%", cursor: "pointer", fontSize: "1rem",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }} aria-label="Cerrar">✕</button>
-
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: 8 }}>Escucha el catálogo completo</h3>
-            <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: 24 }}>
-              Crea tu cuenta gratis y accede a todo. Sin tarjeta de crédito, sin compromiso.
-            </p>
-
+        <div className="zl-overlay" onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }} role="dialog" aria-modal="true" aria-label="Registro">
+          <div className="zl-modal">
+            <button className="zl-modal__close" onClick={() => setModalOpen(false)} aria-label="Cerrar">✕</button>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: 8, letterSpacing: "-0.02em" }}>Escucha el catálogo completo</h3>
+            <p style={{ fontSize: "0.9rem", color: "var(--text-2)", marginBottom: 24 }}>Crea tu cuenta gratis y accede a todo. Sin tarjeta, sin compromiso.</p>
             {formSubmitted ? (
-              <div style={{ textAlign: "center", padding: "20px 0", color: "var(--green)", fontWeight: 700 }}>
-                ✓ ¡Listo! Revisa tu email
-              </div>
+              <div style={{ textAlign: "center", padding: "24px 0", color: "var(--lime)", fontWeight: 700 }}>✓ ¡Listo! Revisa tu email</div>
             ) : (
               <>
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Nombre</label>
-                  <input type="text" placeholder="Tu nombre" style={{
-                    width: "100%", padding: "11px 14px",
-                    background: "var(--surface)", border: "1px solid var(--border-glow)",
-                    borderRadius: 8, color: "var(--text-primary)",
-                    fontFamily: "inherit", fontSize: "0.875rem", outline: "none",
-                  }} />
-                </div>
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Email</label>
-                  <input type="email" placeholder="tuemail@ejemplo.com" style={{
-                    width: "100%", padding: "11px 14px",
-                    background: "var(--surface)", border: "1px solid var(--border-glow)",
-                    borderRadius: 8, color: "var(--text-primary)",
-                    fontFamily: "inherit", fontSize: "0.875rem", outline: "none",
-                  }} />
-                </div>
-                <button onClick={handleFormSubmit} style={{
-                  width: "100%", padding: 13,
-                  background: "var(--amber)", color: "#080b14",
-                  border: "none", borderRadius: 8,
-                  fontFamily: "inherit", fontWeight: 700, fontSize: "0.95rem",
-                  cursor: "pointer",
-                }}>Crear cuenta gratis →</button>
-                <p style={{ textAlign: "center", fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 12 }}>
-                  Te enviaremos un link mágico. Sin contraseñas.
-                </p>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-2)", marginBottom: 6 }}>Nombre</label>
+                <input className="zl-input" type="text" placeholder="Tu nombre" style={{ marginBottom: 16 }} />
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-2)", marginBottom: 6 }}>Email</label>
+                <input className="zl-input" type="email" placeholder="tuemail@ejemplo.com" style={{ marginBottom: 22 }} />
+                <button className="zl-btn zl-btn--primary zl-btn--block" onClick={handleSubmit}>Crear cuenta gratis <Arrow /></button>
+                <p style={{ textAlign: "center", fontSize: "0.75rem", color: "var(--text-3)", marginTop: 12 }}>Te enviaremos un link mágico. Sin contraseñas.</p>
               </>
             )}
           </div>
         </div>
       )}
 
-      {/* Responsive styles */}
+      {/* Responsive */}
       <style>{`
-        @media (max-width: 900px) {
-          .hero-grid { grid-template-columns: 1fr !important; gap: 48px !important; }
-          .cert-grid { grid-template-columns: 1fr !important; }
-          .ai-grid   { grid-template-columns: 1fr !important; }
-          .pricing-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        @media (max-width: 980px) {
+          header.zl-section > .zl-wrap { grid-template-columns: 1fr !important; gap: 48px !important; }
+          #license > .zl-wrap { grid-template-columns: 1fr !important; }
+          .zl-staff-grid { grid-template-columns: 1fr !important; }
+          .zl-coll-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .zl-new-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .zl-mood-grid { grid-template-columns: repeat(3, 1fr) !important; }
+          .zl-pricing-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }
         @media (max-width: 600px) {
-          .pricing-grid { grid-template-columns: 1fr !important; }
+          .zl-coll-grid, .zl-new-grid, .zl-pricing-grid { grid-template-columns: 1fr !important; }
+          .zl-mood-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }
       `}</style>
     </>

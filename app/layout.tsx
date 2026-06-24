@@ -84,7 +84,7 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://api.fontshare.com" />
         <link
-          href="https://api.fontshare.com/v2/css?f[]=satoshi@700,500,400&f[]=general-sans@400&display=swap"
+          href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,900&display=swap"
           rel="stylesheet"
         />
       </head>

@@ -46,10 +46,13 @@ public/           → Static assets
 ```
 
 ## Design tokens (CSS vars in globals.css)
-- --void: #080b14 (background)
-- --purple: #5723fc (primary brand, shared with Creativus)
-- --amber: #f5a623 (accent)
-- --text-primary: #e8ecf4
+Premium editorial dark system (redesigned June 2026).
+- --bg: #0D0D0D (background) · --surface: #171717 · --border: rgba(255,255,255,0.08)
+- --text: #FFFFFF · --text-2: rgba(255,255,255,0.65) · --text-3: rgba(255,255,255,0.42)
+- Accents — --purple: #6E3BFF (electric, primary) · --lime: #CDFF4F (neon) · --orange: #FF8B3D (warm)
+- Component layer lives in globals.css with `.zl-*` classes (hover/motion states). Prefer
+  these classes over inline styles when an interaction/hover is needed.
+- Type: Satoshi (Fontshare). Editorial scale: `.zl-display`, `.zl-h2`, `.zl-eyebrow`.
 
 ## Brand migration (FUTURE — not now)
 When migrating "Sonoris" → "Zoundlist":
