@@ -380,6 +380,18 @@ body::after {
 .zl-foot-link { color: var(--text-3); text-decoration: none; font-size: 0.85rem; transition: color 0.2s var(--ease); }
 .zl-foot-link:hover { color: var(--text); }
 
+/* ── Legal / prose ────────────────────────────────────────── */
+.zl-prose { max-width: 760px; color: var(--text-2); }
+.zl-prose h2 { font-size: 1.3rem; font-weight: 600; color: var(--text); margin: 38px 0 12px; letter-spacing: -0.02em; }
+.zl-prose h3 { font-size: 1.02rem; font-weight: 600; color: var(--text); margin: 22px 0 8px; }
+.zl-prose p { margin: 12px 0; line-height: 1.75; font-size: 0.95rem; }
+.zl-prose ul { margin: 12px 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
+.zl-prose li { line-height: 1.7; font-size: 0.95rem; }
+.zl-prose strong { color: var(--text); font-weight: 600; }
+.zl-prose a { color: var(--purple-2); text-decoration: none; }
+.zl-prose a:hover { text-decoration: underline; }
+.zl-prose__note { padding: 16px 18px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); font-size: 0.88rem; line-height: 1.65; margin: 18px 0; }
+
 /* ── Scroll reveal (calm fade-up) ─────────────────────────── */
 [data-reveal] { opacity: 0; transform: translateY(18px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
 [data-reveal].is-visible { opacity: 1; transform: none; }

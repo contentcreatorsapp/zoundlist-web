@@ -598,8 +598,13 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
             <span className="zl-brand__name">Sonoris</span>
           </a>
           <ul style={{ display: "flex", gap: 24, listStyle: "none", flexWrap: "wrap" }}>
-            {["Términos de licencia", "Privacidad", "Términos de uso", "Contacto"].map((l) => (
-              <li key={l}><a href="#" className="zl-foot-link">{l}</a></li>
+            {[
+              ["Términos de licencia", "/licencia"],
+              ["Privacidad", "/privacidad"],
+              ["Términos de uso", "/terminos"],
+              ["Contacto", "mailto:legal@zoundlist.com"],
+            ].map(([label, href]) => (
+              <li key={label}><a href={href} className="zl-foot-link">{label}</a></li>
             ))}
           </ul>
           <p style={{ fontSize: "0.8rem", color: "var(--text-3)" }}>© 2026 Sonoris · JM Creativos LLC · Puerto Rico</p>
