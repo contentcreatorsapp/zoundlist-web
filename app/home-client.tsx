@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { Catalog, CoverVariant } from "@/types/catalog";
 import { COVERS } from "@/lib/catalog/covers";
+import { usePlayer } from "@/lib/use-player";
 import { signInWithMagicLink } from "@/services/auth";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
@@ -18,6 +19,13 @@ function bars(seed: number, n: number): number[] {
     out.push(8 + (s / 233280) * 26);
   }
   return out;
+}
+
+function fmt(sec: number): string {
+  if (!sec || !isFinite(sec)) return "0:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 // ─── Icons ─────────────────────────────────────────────────────────────────
@@ -41,6 +49,14 @@ function Cover({ variant, glyph, radius }: { variant: CoverVariant; glyph?: stri
       <div className="zl-cover__vignette" />
       {glyph && <span className="zl-cover__glyph">{glyph}</span>}
     </div>
+  );
+}
+
+function ReleasePlay({ on, playing, size = 18 }: { on: boolean; playing: boolean; size?: number }) {
+  return (
+    <span className="zl-release__play" style={on ? { opacity: 1, transform: "translateY(0) scale(1)" } : undefined}>
+      {on && playing ? <Pause size={size} /> : <Play size={size} />}
+    </span>
   );
 }
 
@@ -83,36 +99,14 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [activeFilter, setActiveFilter] = useState("all");
-  const [activeTrack, setActiveTrack] = useState<string | null>(null);
+  const [heroIdx, setHeroIdx] = useState(0);
 
-  // Hero player
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [queueIdx, setQueueIdx] = useState(0);
-  const [progress, setProgress] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const current = heroQueue[queueIdx] ?? heroQueue[0] ?? tracks[0];
+  // Real audio player (falls back to simulated progress for tracks without audio)
+  const player = usePlayer();
+  const playingTrack = tracks.find((t) => t.id === player.playingId);
+  const heroTrack = playingTrack ?? heroQueue[heroIdx] ?? tracks[0];
+  const heroOn = !!heroTrack && player.playingId === heroTrack.id;
   const heroBars = bars(7, 56);
-
-  const startPlay = useCallback(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 1) { setQueueIdx((i) => (i + 1) % heroQueue.length); return 0; }
-        return p + 0.004;
-      });
-    }, 80);
-  }, [heroQueue.length]);
-
-  const togglePlay = useCallback(() => {
-    setIsPlaying((p) => {
-      if (!p) startPlay();
-      else if (intervalRef.current) clearInterval(intervalRef.current);
-      return !p;
-    });
-  }, [startPlay]);
-
-  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
 
   // Nav scroll state
   useEffect(() => {
@@ -137,12 +131,12 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
-      if (e.code === "Space" && tag !== "INPUT" && tag !== "TEXTAREA") { e.preventDefault(); togglePlay(); }
+      if (e.code === "Space" && tag !== "INPUT" && tag !== "TEXTAREA") { e.preventDefault(); if (heroTrack) player.toggle(heroTrack); }
       if (e.key === "Escape") setModalOpen(false);
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [togglePlay]);
+  }, [heroTrack, player]);
 
   // Track auth session → swaps nav buttons
   useEffect(() => {
@@ -161,12 +155,12 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
     else if (flag === "error") { setAuthError("El enlace expiró o no es válido. Pide uno nuevo."); setModalOpen(true); }
   }, []);
 
-  const selectQueue = (i: number) => { setQueueIdx(i); setProgress(0); if (isPlaying) startPlay(); };
-  const playedBars = Math.floor(progress * heroBars.length);
-  const elapsed = Math.floor(progress * 163);
-  const timeDisplay = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")} / ${current?.duration ?? "0:00"}`;
-
-  const handleTrack = (id: string) => setActiveTrack((cur) => (cur === id ? null : id));
+  const selectQueue = (i: number) => { setHeroIdx(i); if (heroQueue[i]) player.toggle(heroQueue[i]); };
+  const playedBars = Math.floor((heroOn ? player.progress : 0) * heroBars.length);
+  const heroDur = heroTrack?.duration ?? "0:00";
+  const timeDisplay = heroOn
+    ? `${fmt(player.currentTime)} / ${player.duration ? fmt(player.duration) : heroDur}`
+    : `0:00 / ${heroDur}`;
 
   const handleSubmit = async () => {
     setAuthError(null);
@@ -254,30 +248,30 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
             <div className="zl-card" style={{ padding: 24, position: "relative", overflow: "hidden" }}>
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(110,59,255,0.6), transparent)" }} />
               <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 20 }}>
-                <div style={{ width: 64, height: 64 }}><Cover variant={current.cover} glyph={current.glyph} radius={14} /></div>
+                <div style={{ width: 64, height: 64 }}><Cover variant={heroTrack.cover} glyph={heroTrack.glyph} radius={14} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "0.7rem", color: "var(--text-3)", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600 }}>Sonando ahora</div>
-                  <div style={{ fontSize: "1.05rem", fontWeight: 700, marginTop: 4 }}>{current.title}</div>
-                  <div style={{ fontSize: "0.82rem", color: "var(--text-2)", marginTop: 2 }}>{current.artist} · {current.bpm} BPM</div>
+                  <div style={{ fontSize: "0.7rem", color: "var(--text-3)", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600 }}>{heroOn && player.isPlaying ? "Sonando ahora" : "En el reproductor"}</div>
+                  <div style={{ fontSize: "1.05rem", fontWeight: 700, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{heroTrack.title}</div>
+                  <div style={{ fontSize: "0.82rem", color: "var(--text-2)", marginTop: 2 }}>{heroTrack.artist} · {heroTrack.bpm} BPM{heroTrack.audioUrl ? "" : " · preview"}</div>
                 </div>
               </div>
 
-              <div className="zl-wave" onClick={togglePlay} role="button" aria-label={isPlaying ? "Pausar" : "Reproducir"}>
+              <div className="zl-wave" onClick={() => player.toggle(heroTrack)} role="button" aria-label={heroOn && player.isPlaying ? "Pausar" : "Reproducir"}>
                 {heroBars.map((h, i) => (
                   <span key={i} style={{
                     height: h,
                     background: i < playedBars ? "linear-gradient(180deg, var(--purple-2), var(--purple))"
                       : i === playedBars ? "var(--lime)" : "rgba(255,255,255,0.12)",
-                    transform: i === playedBars && isPlaying ? "scaleY(1.2)" : "none",
-                    animation: i === playedBars && isPlaying ? "zl-eq 0.45s ease-in-out infinite alternate" : "none",
+                    transform: i === playedBars && heroOn && player.isPlaying ? "scaleY(1.2)" : "none",
+                    animation: i === playedBars && heroOn && player.isPlaying ? "zl-eq 0.45s ease-in-out infinite alternate" : "none",
                   }} />
                 ))}
               </div>
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <button className="zl-iconbtn zl-play-main" onClick={togglePlay} aria-label={isPlaying ? "Pausar" : "Reproducir"}>
-                    {isPlaying ? <Pause /> : <Play />}
+                  <button className="zl-iconbtn zl-play-main" onClick={() => player.toggle(heroTrack)} aria-label={heroOn && player.isPlaying ? "Pausar" : "Reproducir"}>
+                    {heroOn && player.isPlaying ? <Pause /> : <Play />}
                   </button>
                   <span style={{ fontSize: "0.8rem", color: "var(--text-3)", fontVariantNumeric: "tabular-nums" }}>{timeDisplay}</span>
                 </div>
@@ -285,19 +279,22 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
               </div>
 
               <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 6 }}>
-                {heroQueue.map((t, i) => (
-                  <div key={t.id} className={`zl-queue-item${i === queueIdx ? " is-active" : ""}`} onClick={() => selectQueue(i)} role="button" aria-label={`Reproducir ${t.title}`}>
-                    <span style={{ width: 16, textAlign: "center", fontSize: "0.75rem", color: i === queueIdx ? "var(--lime)" : "var(--text-3)" }}>
-                      {i === queueIdx && isPlaying ? "♪" : i + 1}
-                    </span>
-                    <div style={{ width: 34, height: 34 }}><Cover variant={t.cover} radius={8} /></div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "0.85rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.title}</div>
-                      <div style={{ fontSize: "0.72rem", color: "var(--text-3)" }}>{t.artist}</div>
+                {heroQueue.map((t, i) => {
+                  const on = player.playingId === t.id;
+                  return (
+                    <div key={t.id} className={`zl-queue-item${on ? " is-active" : ""}`} onClick={() => selectQueue(i)} role="button" aria-label={`Reproducir ${t.title}`}>
+                      <span style={{ width: 16, textAlign: "center", fontSize: "0.75rem", color: on ? "var(--lime)" : "var(--text-3)" }}>
+                        {on && player.isPlaying ? "♪" : i + 1}
+                      </span>
+                      <div style={{ width: 34, height: 34 }}><Cover variant={t.cover} radius={8} /></div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "0.85rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.title}</div>
+                        <div style={{ fontSize: "0.72rem", color: "var(--text-3)" }}>{t.artist}</div>
+                      </div>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-3)", fontVariantNumeric: "tabular-nums" }}>{t.duration}</span>
                     </div>
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-3)", fontVariantNumeric: "tabular-nums" }}>{t.duration}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -310,9 +307,9 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <SectionHeader eyebrow="Lanzamientos destacados" title="Estrenos de la semana" desc="Lo nuevo, escogido a mano por nuestro equipo de curación." action="Ver todo" />
           <div className="zl-rail" data-reveal>
             {featured.map((t) => (
-              <button key={t.id} className="zl-release" onClick={() => handleTrack(t.id)} aria-label={`Reproducir ${t.title}`}>
+              <button key={t.id} className="zl-release" onClick={() => player.toggle(t)} aria-label={`Reproducir ${t.title}`}>
                 <Cover variant={t.cover} glyph={t.glyph} />
-                <span className="zl-release__play"><Play size={18} /></span>
+                <ReleasePlay on={player.playingId === t.id} playing={player.isPlaying} />
                 <div className="zl-release__title">{t.title}</div>
                 <div className="zl-release__meta">{t.artist} · {t.mood}</div>
               </button>
@@ -327,10 +324,10 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <SectionHeader eyebrow="En tendencia" title="Lo más sonado ahora" desc="Los tracks que más se están descargando esta semana." action="Explorar catálogo" />
           <div className="zl-tracks" data-reveal>
             {trending.map((t, i) => {
-              const playing = activeTrack === t.id;
+              const on = player.playingId === t.id;
               return (
-                <button key={t.id} className={`zl-track${playing ? " is-playing" : ""}`} onClick={() => handleTrack(t.id)} aria-label={`Reproducir ${t.title}`}>
-                  <span className="zl-track__rank">{playing ? <Play size={13} /> : i + 1}</span>
+                <button key={t.id} className={`zl-track${on ? " is-playing" : ""}`} onClick={() => player.toggle(t)} aria-label={`Reproducir ${t.title}`}>
+                  <span className="zl-track__rank">{on ? (player.isPlaying ? <Pause size={13} /> : <Play size={13} />) : i + 1}</span>
                   <span className="zl-track__cover"><Cover variant={t.cover} glyph={t.glyph} radius={10} /></span>
                   <span style={{ minWidth: 0 }}>
                     <span className="zl-track__title" style={{ display: "block" }}>{t.title}</span>
@@ -351,11 +348,11 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <SectionHeader eyebrow="Selección del equipo" title="Staff Picks" desc="Una pieza destacada y las que la acompañan, elegidas con criterio editorial." />
           <div data-reveal style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 40, alignItems: "stretch" }} className="zl-staff-grid">
             {/* Hero pick */}
-            <button className="zl-release" onClick={() => handleTrack(staffHero.id)} style={{ position: "relative" }} aria-label={`Reproducir ${staffHero.title}`}>
+            <button className="zl-release" onClick={() => player.toggle(staffHero)} style={{ position: "relative" }} aria-label={`Reproducir ${staffHero.title}`}>
               <div style={{ position: "relative", borderRadius: "var(--r-lg)", overflow: "hidden", aspectRatio: "16 / 11" }}>
                 <div style={{ position: "absolute", inset: 0, background: COVERS[staffHero.cover] }} />
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 35%, rgba(0,0,0,0.78))" }} />
-                <span className="zl-release__play" style={{ width: 56, height: 56 }}><Play size={22} /></span>
+                <span className="zl-release__play" style={{ width: 56, height: 56, ...(player.playingId === staffHero.id ? { opacity: 1, transform: "translateY(0) scale(1)" } : {}) }}>{player.playingId === staffHero.id && player.isPlaying ? <Pause size={22} /> : <Play size={22} />}</span>
                 <div style={{ position: "absolute", left: 26, bottom: 24, right: 26 }}>
                   <span className="zl-tag" style={{ marginBottom: 12, display: "inline-block" }}>Pick de la semana</span>
                   <div style={{ fontSize: "1.7rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#fff" }}>{staffHero.title}</div>
@@ -377,10 +374,10 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {staffList.map((t, i) => {
-                  const playing = activeTrack === t.id;
+                  const on = player.playingId === t.id;
                   return (
-                    <button key={t.id} className={`zl-track${playing ? " is-playing" : ""}`} onClick={() => handleTrack(t.id)} style={{ gridTemplateColumns: "26px 46px 1fr auto" }} aria-label={`Reproducir ${t.title}`}>
-                      <span className="zl-track__rank">{playing ? <Play size={12} /> : i + 1}</span>
+                    <button key={t.id} className={`zl-track${on ? " is-playing" : ""}`} onClick={() => player.toggle(t)} style={{ gridTemplateColumns: "26px 46px 1fr auto" }} aria-label={`Reproducir ${t.title}`}>
+                      <span className="zl-track__rank">{on ? (player.isPlaying ? <Pause size={12} /> : <Play size={12} />) : i + 1}</span>
                       <span style={{ width: 46, height: 46 }}><Cover variant={t.cover} glyph={t.glyph} radius={9} /></span>
                       <span style={{ minWidth: 0 }}>
                         <span className="zl-track__title" style={{ display: "block" }}>{t.title}</span>
@@ -403,11 +400,11 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <SectionHeader eyebrow="Novedades" title="Recién añadido" desc="Pistas frescas que acaban de entrar al catálogo." action="Ver novedades" />
           <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 24 }} className="zl-new-grid">
             {newMusic.map((t) => (
-              <button key={t.id} className="zl-release" onClick={() => handleTrack(t.id)} aria-label={`Reproducir ${t.title}`}>
+              <button key={t.id} className="zl-release" onClick={() => player.toggle(t)} aria-label={`Reproducir ${t.title}`}>
                 <div style={{ position: "relative" }}>
                   <Cover variant={t.cover} glyph={t.glyph} />
                   <span className="zl-pill-new" style={{ position: "absolute", top: 12, left: 12 }}>Nuevo</span>
-                  <span className="zl-release__play"><Play size={18} /></span>
+                  <ReleasePlay on={player.playingId === t.id} playing={player.isPlaying} />
                 </div>
                 <div className="zl-release__title">{t.title}</div>
                 <div className="zl-release__meta">{t.artist} · {t.duration}</div>
@@ -471,9 +468,9 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           </div>
           <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 24 }}>
             {filtered.map((t) => (
-              <button key={t.id} className="zl-release" onClick={() => handleTrack(t.id)} aria-label={`Reproducir ${t.title}`}>
+              <button key={t.id} className="zl-release" onClick={() => player.toggle(t)} aria-label={`Reproducir ${t.title}`}>
                 <Cover variant={t.cover} glyph={t.glyph} />
-                <span className="zl-release__play"><Play size={18} /></span>
+                <ReleasePlay on={player.playingId === t.id} playing={player.isPlaying} />
                 <div className="zl-release__title">{t.title}</div>
                 <div className="zl-release__meta">{t.artist} · {t.bpm} BPM · {t.duration}</div>
                 <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
