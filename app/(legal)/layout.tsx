@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Brand } from "@/components/brand";
 
 const DOCS = [
   ["Términos de uso", "/terminos"],
@@ -11,12 +12,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
     <main style={{ position: "relative", zIndex: 1, minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <header style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="zl-wrap" style={{ height: 72, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <Link href="/" className="zl-brand">
-            <span className="zl-brand__mark">
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="#fff"><path d="M12 3v10.55A4 4 0 1014 17V7h4V3z" /></svg>
-            </span>
-            <span className="zl-brand__name">Zoundlist</span>
-          </Link>
+          <Brand height={22} />
           <Link href="/" className="zl-btn zl-btn--ghost zl-btn--sm">← Inicio</Link>
         </div>
       </header>
@@ -32,7 +28,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
               <li key={href}><Link href={href} className="zl-foot-link">{label}</Link></li>
             ))}
           </ul>
-          <p style={{ fontSize: "0.8rem", color: "var(--text-3)" }}>© 2026 Sonoris · JM Creativos LLC · Puerto Rico</p>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-3)" }}>© 2026 Zoundlist · JM Creativos LLC · Puerto Rico</p>
         </div>
       </footer>
     </main>

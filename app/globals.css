@@ -1,6 +1,6 @@
 /* ============================================
    ZOUNDLIST — DESIGN SYSTEM
-   Brand internal name: Sonoris (temp)
+   Brand: Zoundlist · Accent: #95F908 on black & white
    Domain: zoundlist.com · Platform: Web-only
    Language: premium editorial · dark cinematic
    ============================================ */
@@ -23,14 +23,23 @@
   --text-2:      rgba(255, 255, 255, 0.65);
   --text-3:      rgba(255, 255, 255, 0.42);
 
-  /* Accents — electric purple · neon lime · warm orange */
-  --purple:      #6E3BFF;
-  --purple-2:    #9B7BFF;
-  --purple-dim:  rgba(110, 59, 255, 0.14);
-  --lime:        #CDFF4F;
-  --lime-dim:    rgba(205, 255, 79, 0.12);
-  --orange:      #FF8B3D;
-  --orange-dim:  rgba(255, 139, 61, 0.12);
+  /* Brand — Zoundlist neon green (#95f908) on black & white */
+  --brand:       #95F908;
+  --brand-2:     #B6FF3A;
+  --brand-3:     #6FC406;
+  --brand-dim:   rgba(149, 249, 8, 0.14);
+  --brand-ink:   #0A0A0A; /* text/icon on green */
+
+  /* Legacy accent aliases now point to the brand (keeps existing usages on-brand) */
+  --purple:      var(--brand);
+  --purple-2:    var(--brand-2);
+  --purple-dim:  var(--brand-dim);
+  --lime:        var(--brand);
+  --lime-dim:    var(--brand-dim);
+
+  /* Semantic */
+  --orange:      #FF7A45; /* errors / warnings only */
+  --orange-dim:  rgba(255, 122, 69, 0.12);
 
   /* Radii */
   --r-sm: 10px;
@@ -72,8 +81,8 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(900px 520px at 50% -8%, rgba(110, 59, 255, 0.16), transparent 60%),
-    radial-gradient(700px 460px at 92% 18%, rgba(255, 139, 61, 0.05), transparent 60%);
+    radial-gradient(900px 520px at 50% -8%, rgba(149, 249, 8, 0.13), transparent 60%),
+    radial-gradient(700px 460px at 90% 16%, rgba(149, 249, 8, 0.04), transparent 60%);
   pointer-events: none;
   z-index: 0;
 }
@@ -105,7 +114,7 @@ body::after {
 }
 .zl-display em {
   font-style: normal;
-  background: linear-gradient(105deg, var(--purple-2), var(--lime) 55%, var(--orange));
+  background: linear-gradient(105deg, var(--brand), #C8FF5E 60%, var(--brand-2));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -158,19 +167,19 @@ body::after {
               border-color 0.25s var(--ease), box-shadow 0.25s var(--ease), color 0.25s var(--ease);
 }
 .zl-btn--primary {
-  background: linear-gradient(135deg, var(--purple), var(--purple-2));
-  color: #fff;
-  box-shadow: 0 8px 30px rgba(110, 59, 255, 0.28);
+  background: var(--brand);
+  color: var(--brand-ink);
+  box-shadow: 0 8px 30px rgba(149, 249, 8, 0.24);
 }
-.zl-btn--primary:hover { transform: translateY(-2px); box-shadow: 0 14px 40px rgba(110, 59, 255, 0.42); }
+.zl-btn--primary:hover { transform: translateY(-2px); background: var(--brand-2); box-shadow: 0 14px 40px rgba(149, 249, 8, 0.38); }
 .zl-btn--ghost {
   background: rgba(255, 255, 255, 0.03);
   border-color: var(--border-2);
   color: var(--text-2);
 }
 .zl-btn--ghost:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.28); background: rgba(255, 255, 255, 0.06); }
-.zl-btn--lime { background: var(--lime); color: #0D0D0D; }
-.zl-btn--lime:hover { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(205, 255, 79, 0.28); }
+.zl-btn--lime { background: var(--brand); color: var(--brand-ink); }
+.zl-btn--lime:hover { transform: translateY(-2px); background: var(--brand-2); box-shadow: 0 12px 36px rgba(149, 249, 8, 0.28); }
 .zl-btn--sm { padding: 9px 16px; font-size: 0.82rem; border-radius: var(--r-sm); }
 .zl-btn--block { width: 100%; }
 
@@ -189,7 +198,7 @@ body::after {
   width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
   background: linear-gradient(135deg, var(--purple), var(--purple-2));
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 18px rgba(110, 59, 255, 0.4);
+  box-shadow: 0 4px 18px rgba(149, 249, 8, 0.4);
 }
 .zl-brand__name { font-size: 1.15rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
 .zl-nav__links { display: flex; gap: 6px; list-style: none; }
@@ -297,7 +306,7 @@ body::after {
   cursor: pointer; transition: all 0.2s var(--ease);
 }
 .zl-chip:hover { color: var(--text); border-color: var(--border-2); }
-.zl-chip.is-active { background: var(--purple-dim); border-color: rgba(110, 59, 255, 0.45); color: var(--purple-2); }
+.zl-chip.is-active { background: var(--purple-dim); border-color: rgba(149, 249, 8, 0.45); color: var(--purple-2); }
 .zl-tag {
   display: inline-block; padding: 3px 10px; border-radius: 100px;
   font-size: 0.68rem; font-weight: 500; color: var(--text-2);
@@ -329,13 +338,13 @@ body::after {
   transition: transform 0.2s var(--ease), background 0.2s var(--ease), box-shadow 0.2s var(--ease);
 }
 .zl-iconbtn:hover { transform: scale(1.06); }
-.zl-play-main { width: 52px; height: 52px; background: linear-gradient(135deg, var(--purple), var(--purple-2)); color: #fff; box-shadow: 0 8px 26px rgba(110, 59, 255, 0.4); }
+.zl-play-main { width: 52px; height: 52px; background: var(--brand); color: var(--brand-ink); box-shadow: 0 8px 26px rgba(149, 249, 8, 0.4); }
 .zl-queue-item {
   display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r-sm);
   cursor: pointer; border: 1px solid transparent; transition: background 0.2s var(--ease), border-color 0.2s var(--ease);
 }
 .zl-queue-item:hover { background: var(--surface-2); }
-.zl-queue-item.is-active { background: var(--purple-dim); border-color: rgba(110, 59, 255, 0.3); }
+.zl-queue-item.is-active { background: var(--purple-dim); border-color: rgba(149, 249, 8, 0.3); }
 
 /* ── Pricing ──────────────────────────────────────────────── */
 .zl-plan {
@@ -344,7 +353,7 @@ body::after {
   padding: 30px 26px; transition: transform 0.35s var(--ease), border-color 0.35s var(--ease);
 }
 .zl-plan:hover { transform: translateY(-4px); border-color: var(--border-2); }
-.zl-plan.is-featured { border-color: rgba(110, 59, 255, 0.5); background: linear-gradient(165deg, var(--surface), rgba(110, 59, 255, 0.08)); }
+.zl-plan.is-featured { border-color: rgba(149, 249, 8, 0.5); background: linear-gradient(165deg, var(--surface), rgba(149, 249, 8, 0.08)); }
 
 /* ── Inputs ───────────────────────────────────────────────── */
 .zl-input {

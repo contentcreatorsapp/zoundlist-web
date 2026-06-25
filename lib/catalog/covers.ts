@@ -4,13 +4,15 @@ import type { CoverVariant } from "@/types/catalog";
  * Gradient-mesh "album art" — premium covers rendered purely in CSS,
  * so the catalog needs no uploaded images yet. Keyed by cover variant.
  */
+// Brand-aligned cover palette: Zoundlist green (#95f908) as the hero,
+// varied with teal / mint / olive / cool darks. Cohesive, no rainbow.
 export const COVERS: Record<CoverVariant, string> = {
-  violet:  "radial-gradient(120% 120% at 18% 18%, #8B6BFF 0%, transparent 52%), radial-gradient(120% 120% at 86% 4%, #6E3BFF 0%, transparent 46%), linear-gradient(155deg, #1a1230, #0d0d0d)",
-  lime:    "radial-gradient(120% 120% at 82% 16%, #CDFF4F 0%, transparent 46%), radial-gradient(110% 110% at 8% 92%, #4f6f1a 0%, transparent 52%), linear-gradient(155deg, #161a0c, #0d0d0d)",
-  orange:  "radial-gradient(120% 120% at 20% 82%, #FF8B3D 0%, transparent 52%), radial-gradient(110% 110% at 92% 10%, #ff4d6d 0%, transparent 46%), linear-gradient(155deg, #20120a, #0d0d0d)",
-  magenta: "radial-gradient(120% 120% at 80% 80%, #ff4db8 0%, transparent 50%), radial-gradient(110% 110% at 10% 14%, #7a2bff 0%, transparent 48%), linear-gradient(155deg, #1c0f1e, #0d0d0d)",
-  teal:    "radial-gradient(120% 120% at 22% 24%, #2bd6c0 0%, transparent 50%), radial-gradient(110% 110% at 88% 86%, #2b7bff 0%, transparent 48%), linear-gradient(155deg, #0a1a1c, #0d0d0d)",
-  gold:    "radial-gradient(120% 120% at 80% 22%, #f7c752 0%, transparent 48%), radial-gradient(110% 110% at 12% 88%, #ff8b3d 0%, transparent 50%), linear-gradient(155deg, #1d160a, #0d0d0d)",
-  ice:     "radial-gradient(120% 120% at 24% 18%, #9fd2ff 0%, transparent 50%), radial-gradient(110% 110% at 86% 88%, #8B6BFF 0%, transparent 48%), linear-gradient(155deg, #11161f, #0d0d0d)",
-  ember:   "radial-gradient(120% 120% at 78% 76%, #ff5e3d 0%, transparent 50%), radial-gradient(110% 110% at 16% 16%, #ff2d55 0%, transparent 46%), linear-gradient(155deg, #1e0e0c, #0d0d0d)",
+  violet:  "radial-gradient(120% 120% at 20% 18%, #95F908 0%, transparent 50%), radial-gradient(120% 120% at 85% 8%, #0f7a3a 0%, transparent 48%), linear-gradient(155deg, #0c1a10, #0a0a0a)",
+  lime:    "radial-gradient(120% 120% at 80% 18%, #B6FF3A 0%, transparent 48%), radial-gradient(110% 110% at 10% 90%, #6fae0a 0%, transparent 50%), linear-gradient(155deg, #141a08, #0a0a0a)",
+  orange:  "radial-gradient(120% 120% at 22% 80%, #C8E636 0%, transparent 50%), radial-gradient(110% 110% at 90% 12%, #4d7a12 0%, transparent 46%), linear-gradient(155deg, #16180a, #0a0a0a)",
+  magenta: "radial-gradient(120% 120% at 80% 78%, #2BD6A0 0%, transparent 50%), radial-gradient(110% 110% at 12% 16%, #95F908 0%, transparent 44%), linear-gradient(155deg, #08160f, #0a0a0a)",
+  teal:    "radial-gradient(120% 120% at 24% 24%, #2BD6C0 0%, transparent 50%), radial-gradient(110% 110% at 88% 86%, #1f9e7a 0%, transparent 46%), linear-gradient(155deg, #08161a, #0a0a0a)",
+  gold:    "radial-gradient(120% 120% at 80% 22%, #B9FFD0 0%, transparent 46%), radial-gradient(110% 110% at 12% 88%, #46c46a 0%, transparent 50%), linear-gradient(155deg, #0c1612, #0a0a0a)",
+  ice:     "radial-gradient(120% 120% at 24% 18%, #E8EFE6 0%, transparent 48%), radial-gradient(110% 110% at 86% 88%, #95F908 0%, transparent 32%), linear-gradient(155deg, #14161a, #0a0a0a)",
+  ember:   "radial-gradient(120% 120% at 78% 76%, #95F908 0%, transparent 42%), radial-gradient(110% 110% at 16% 16%, #1a3a1f 0%, transparent 50%), linear-gradient(155deg, #101410, #0a0a0a)",
 };

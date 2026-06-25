@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getMyProfile } from "@/services/profile";
+import { Brand } from "@/components/brand";
 import { SignOutButton } from "./sign-out-button";
 
 export const metadata = { title: "Mi panel" };
@@ -22,14 +23,9 @@ export default async function DashboardPage() {
       {/* Top bar */}
       <header style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="zl-wrap" style={{ height: 72, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <a href="/" className="zl-brand">
-            <span className="zl-brand__mark">
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="#fff"><path d="M12 3v10.55A4 4 0 1014 17V7h4V3z" /></svg>
-            </span>
-            <span className="zl-brand__name">Sonoris</span>
-          </a>
+          <Brand height={22} />
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            {isAdmin && <span className="zl-tag" style={{ color: "var(--lime)", borderColor: "rgba(205,255,79,0.3)" }}>Admin</span>}
+            {isAdmin && <span className="zl-tag" style={{ color: "var(--brand)", borderColor: "rgba(149,249,8,0.3)" }}>Admin</span>}
             <span style={{ fontSize: "0.85rem", color: "var(--text-2)" }} className="zl-hide-md">{profile.email}</span>
             <SignOutButton />
           </div>

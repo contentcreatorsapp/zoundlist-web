@@ -2,7 +2,11 @@
 
 ## Project identity
 - **Project name:** zoundlist-web
-- **Brand name in UI:** Sonoris (temporary — do NOT replace yet)
+- **Brand name in UI:** Zoundlist (migration from "Sonoris" completed June 2026)
+- **Operating company:** JM Creativos LLC (Puerto Rico)
+- **Logo assets:** `public/zoundlist-wordmark.png` (white wordmark, used in headers via
+  `components/brand.tsx`) · `public/zoundlist-icon*.png` (Z isotipo) · `app/icon.png` (favicon).
+- **Brand colors:** black `#000000` · white `#FFFFFF` · neon green `#95F908` (accent).
 - **Production domain:** https://zoundlist.com
 - **Platform:** Web-only. No mobile, no Capacitor, no iOS, no Android.
 
@@ -49,19 +53,19 @@ public/           → Static assets
 Premium editorial dark system (redesigned June 2026).
 - --bg: #0D0D0D (background) · --surface: #171717 · --border: rgba(255,255,255,0.08)
 - --text: #FFFFFF · --text-2: rgba(255,255,255,0.65) · --text-3: rgba(255,255,255,0.42)
-- Accents — --purple: #6E3BFF (electric, primary) · --lime: #CDFF4F (neon) · --orange: #FF8B3D (warm)
+- Brand accent — `--brand: #95F908` (neon green) with `--brand-ink: #0A0A0A` (text/icon on green).
+  Primary & lime buttons are flat green with black text. Legacy `--purple`/`--lime` vars are
+  aliases that now point to the brand green (kept so older inline styles stay on-brand).
+- `--orange: #FF7A45` is reserved for errors/warnings only — not a brand accent.
 - Component layer lives in globals.css with `.zl-*` classes (hover/motion states). Prefer
   these classes over inline styles when an interaction/hover is needed.
 - Type: Satoshi (Fontshare). Editorial scale: `.zl-display`, `.zl-h2`, `.zl-eyebrow`.
+- Cover art: gradient-mesh palette in `lib/catalog/covers.ts` (green/teal/mint + cool darks).
 
-## Brand migration (FUTURE — not now)
-When migrating "Sonoris" → "Zoundlist":
-1. app/layout.tsx — siteName, title, OG alt
-2. app/page.tsx — logo text, footer copyright
-3. CLAUDE.md — brand name
-4. package.json — name field
-5. Certificate prefix: SNR- → ZND- (or decide new prefix)
-6. Legal docs — replace [BRAND_NAME] placeholder
+## Brand (migration completed June 2026)
+"Sonoris" → "Zoundlist" is DONE across UI, metadata, certificate prefix (ZND-), logo and favicon.
+Legal docs use placeholders centralized in `lib/legal/config.ts`. Use `components/brand.tsx`
+for the wordmark lockup in any new header/footer.
 
 ## DO NOT
 - Add mobile app configuration
@@ -69,7 +73,6 @@ When migrating "Sonoris" → "Zoundlist":
 - Add Universal Links / App Links
 - Add apple-app-site-association
 - Add assetlinks.json
-- Replace "Sonoris" brand name in UI (migration is a separate task)
 - Hardcode zoundlist.com URLs — use NEXT_PUBLIC_APP_URL env var
 
 ## Current state (June 2026)

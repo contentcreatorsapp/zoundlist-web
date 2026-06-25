@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { Catalog, CoverVariant } from "@/types/catalog";
 import { COVERS } from "@/lib/catalog/covers";
+import { Brand } from "@/components/brand";
 import { usePlayer } from "@/lib/use-player";
 import { signInWithMagicLink } from "@/services/auth";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
@@ -198,12 +199,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
       {/* ── NAV ── */}
       <nav className={`zl-nav${scrolled ? " is-scrolled" : ""}`}>
         <div className="zl-wrap zl-nav__inner">
-          <a href="/" className="zl-brand">
-            <span className="zl-brand__mark">
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="#fff"><path d="M12 3v10.55A4 4 0 1014 17V7h4V3z" /></svg>
-            </span>
-            <span className="zl-brand__name">Sonoris</span>
-          </a>
+          <Brand height={24} />
 
           <ul className="zl-nav__links zl-hide-md">
             <li><a href="#featured" className="zl-nav__link">Descubrir</a></li>
@@ -262,7 +258,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           {/* Featured player */}
           <div data-reveal>
             <div className="zl-card" style={{ padding: 24, position: "relative", overflow: "hidden" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(110,59,255,0.6), transparent)" }} />
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(149,249,8,0.6), transparent)" }} />
               <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 20 }}>
                 <div style={{ width: 64, height: 64 }}><Cover variant={heroTrack.cover} glyph={heroTrack.glyph} radius={14} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -385,7 +381,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
                 </p>
                 <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg, var(--purple), var(--purple-2))" }} />
-                  <span style={{ fontSize: "0.82rem", color: "var(--text-2)" }}>Curado por <strong style={{ color: "var(--text)" }}>el equipo Sonoris</strong></span>
+                  <span style={{ fontSize: "0.82rem", color: "var(--text-2)" }}>Curado por <strong style={{ color: "var(--text)" }}>el equipo Zoundlist</strong></span>
                 </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -504,11 +500,11 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
         <div className="zl-wrap" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56, alignItems: "center" }}>
           <div className="zl-card" data-reveal style={{ padding: 30 }}>
             <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: 18, marginBottom: 18, borderBottom: "1px solid var(--border)" }}>
-              <span style={{ fontWeight: 700 }}>Sonoris</span>
+              <span style={{ fontWeight: 700 }}>Zoundlist</span>
               <span style={{ fontSize: "0.75rem", color: "var(--text-3)" }}>Certificado de Licencia</span>
             </div>
             {[
-              ["N° de Certificado", "SNR-2026-00847"],
+              ["N° de Certificado", "ZND-2026-00847"],
               ["Track", "Midnight Drive"],
               ["ID de Track", "TRK-00291"],
               ["Plan", "Creator"],
@@ -607,12 +603,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
       {/* ── FOOTER ── */}
       <footer style={{ borderTop: "1px solid var(--border)", padding: "44px 0", position: "relative", zIndex: 1 }}>
         <div className="zl-wrap" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
-          <a href="/" className="zl-brand">
-            <span className="zl-brand__mark">
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="#fff"><path d="M12 3v10.55A4 4 0 1014 17V7h4V3z" /></svg>
-            </span>
-            <span className="zl-brand__name">Sonoris</span>
-          </a>
+          <Brand height={22} />
           <ul style={{ display: "flex", gap: 24, listStyle: "none", flexWrap: "wrap" }}>
             {[
               ["Términos de licencia", "/licencia"],
@@ -623,7 +614,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
               <li key={label}><a href={href} className="zl-foot-link">{label}</a></li>
             ))}
           </ul>
-          <p style={{ fontSize: "0.8rem", color: "var(--text-3)" }}>© 2026 Sonoris · JM Creativos LLC · Puerto Rico</p>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-3)" }}>© 2026 Zoundlist · JM Creativos LLC · Puerto Rico</p>
         </div>
       </footer>
 

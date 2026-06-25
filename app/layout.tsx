@@ -3,14 +3,13 @@ import "./globals.css";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://zoundlist.com";
 
-// NOTE: Brand name in UI is temporarily "Sonoris" pending migration.
-// Domain is zoundlist.com. Metadata uses zoundlist.com throughout.
+// Brand: Zoundlist (operated by JM Creativos LLC). Domain: zoundlist.com.
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
 
   title: {
-    default: "Sonoris — Música para lo que estás creando",
-    template: "%s | Sonoris",
+    default: "Zoundlist — Música para lo que estás creando",
+    template: "%s | Zoundlist",
   },
 
   description:
@@ -34,24 +33,24 @@ export const metadata: Metadata = {
     type: "website",
     locale: "es_PR",
     url: APP_URL,
-    siteName: "Sonoris", // TODO: update to Zoundlist on brand migration
-    title: "Sonoris — Música para lo que estás creando",
+    siteName: "Zoundlist",
+    title: "Zoundlist — Música para lo que estás creando",
     description:
       "Música cinematográfica creada con IA y curada a mano. " +
       "Licencia incluida en cada descarga.",
     images: [
       {
-        url: "/og-image.png", // 1200x630 — add to public/ before launch
+        url: "/og-image.png", // 1200x630 — reemplazar por una imagen de marca real
         width: 1200,
         height: 630,
-        alt: "Sonoris — Música para lo que estás creando",
+        alt: "Zoundlist — Música para lo que estás creando",
       },
     ],
   },
 
   twitter: {
     card: "summary_large_image",
-    title: "Sonoris — Música para lo que estás creando",
+    title: "Zoundlist — Música para lo que estás creando",
     description: "Música cinematográfica creada con IA. Licencia incluida.",
     images: ["/og-image.png"],
     // site: "@zoundlist", // uncomment when account exists

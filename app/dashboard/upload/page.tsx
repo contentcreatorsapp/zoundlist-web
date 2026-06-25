@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getMyProfile } from "@/services/profile";
 import { getCatalog } from "@/services/catalog";
+import { Brand } from "@/components/brand";
 import { UploadForm } from "./upload-form";
 
 export const metadata = { title: "Subir música" };
@@ -17,12 +18,7 @@ export default async function UploadPage() {
     <main style={{ position: "relative", zIndex: 1, minHeight: "100vh" }}>
       <header style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="zl-wrap" style={{ height: 72, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <a href="/dashboard" className="zl-brand">
-            <span className="zl-brand__mark">
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="#fff"><path d="M12 3v10.55A4 4 0 1014 17V7h4V3z" /></svg>
-            </span>
-            <span className="zl-brand__name">Sonoris</span>
-          </a>
+          <Brand height={22} href="/dashboard" />
           <a href="/dashboard" className="zl-btn zl-btn--ghost zl-btn--sm">← Volver al panel</a>
         </div>
       </header>
