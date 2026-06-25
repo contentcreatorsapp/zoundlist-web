@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 
   openGraph: {
     type: "website",
-    locale: "es_PR",
+    locale: "es_US",
     url: APP_URL,
     siteName: "Zoundlist",
     title: "Zoundlist — Música para lo que estás creando",

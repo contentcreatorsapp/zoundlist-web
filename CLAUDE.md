@@ -3,7 +3,7 @@
 ## Project identity
 - **Project name:** zoundlist-web
 - **Brand name in UI:** Zoundlist (migration from "Sonoris" completed June 2026)
-- **Operating company:** JM Creativos LLC (Puerto Rico)
+- **Operating company:** JM Creativos LLC (Pennsylvania)
 - **Logo assets:** `public/zoundlist-wordmark.png` (white wordmark, used in headers via
   `components/brand.tsx`) · `public/zoundlist-icon*.png` (Z isotipo) · `app/icon.png` (favicon).
 - **Brand colors:** black `#000000` · white `#FFFFFF` · neon green `#95F908` (accent).

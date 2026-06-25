@@ -28,7 +28,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
               <li key={href}><Link href={href} className="zl-foot-link">{label}</Link></li>
             ))}
           </ul>
-          <p style={{ fontSize: "0.8rem", color: "var(--text-3)" }}>© 2026 Zoundlist · JM Creativos LLC · Puerto Rico</p>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-3)" }}>© 2026 Zoundlist · JM Creativos LLC · Pennsylvania</p>
         </div>
       </footer>
     </main>
