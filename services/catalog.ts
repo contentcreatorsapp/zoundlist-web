@@ -22,6 +22,7 @@ function mapTrack(r: any): Track {
     glyph: r.glyph ?? "🎵",
     bpm: r.bpm ?? 0,
     duration: r.duration ?? "",
+    audioUrl: r.audio_path ?? null,
     featured: !!r.featured,
     trending: !!r.trending,
     staffPick: !!r.staff_pick,

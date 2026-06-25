@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getMyProfile } from "@/services/profile";
 import { SignOutButton } from "./sign-out-button";
 
 export const metadata = { title: "Mi panel" };
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   // Degrade gracefully if Supabase isn't configured yet.
@@ -10,15 +11,11 @@ export default async function DashboardPage() {
     redirect("/");
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const profile = await getMyProfile();
+  if (!profile) redirect("/?auth=required");
 
-  // Middleware guards this route, but double-check on render.
-  if (!user) redirect("/?auth=required");
-
-  const name = (user.user_metadata?.full_name as string) || user.email?.split("@")[0] || "creador";
+  const isAdmin = profile.role === "admin";
+  const name = profile.fullName || profile.email?.split("@")[0] || "creador";
 
   return (
     <main style={{ position: "relative", zIndex: 1, minHeight: "100vh" }}>
@@ -32,7 +29,8 @@ export default async function DashboardPage() {
             <span className="zl-brand__name">Sonoris</span>
           </a>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <span style={{ fontSize: "0.85rem", color: "var(--text-2)" }}>{user.email}</span>
+            {isAdmin && <span className="zl-tag" style={{ color: "var(--lime)", borderColor: "rgba(205,255,79,0.3)" }}>Admin</span>}
+            <span style={{ fontSize: "0.85rem", color: "var(--text-2)" }} className="zl-hide-md">{profile.email}</span>
             <SignOutButton />
           </div>
         </div>
@@ -42,19 +40,37 @@ export default async function DashboardPage() {
         <span className="zl-eyebrow">Tu panel</span>
         <h1 className="zl-h2" style={{ margin: "12px 0 10px" }}>Hola, {name} 👋</h1>
         <p className="zl-muted" style={{ maxWidth: 520 }}>
-          Tu cuenta está activa. Desde aquí gestionarás tus descargas, licencias y —muy pronto— la carga de música al catálogo.
+          Tu cuenta está activa. Desde aquí gestionas tus descargas, licencias{isAdmin ? " y la carga de música al catálogo" : ""}.
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 20, marginTop: 40 }}>
+          {/* Upload — live for admins */}
+          {isAdmin ? (
+            <a href="/dashboard/upload" className="zl-card" style={{ padding: 24, textDecoration: "none", display: "block" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <h3 style={{ fontSize: "1.02rem", fontWeight: 700, color: "var(--text)" }}>Subir música →</h3>
+                <span className="zl-pill-new">Activo</span>
+              </div>
+              <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>Carga tracks al catálogo curado: audio, metadatos y portada.</p>
+            </a>
+          ) : (
+            <div className="zl-card" style={{ padding: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <h3 style={{ fontSize: "1.02rem", fontWeight: 700 }}>Subir música</h3>
+                <span className="zl-tag">Solo admin</span>
+              </div>
+              <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>La carga de música está reservada al equipo de curación.</p>
+            </div>
+          )}
+
           {[
-            { title: "Subir música", desc: "Carga de tracks al catálogo curado. Llega en la Fase 3.", soon: true },
-            { title: "Mis descargas", desc: "Historial de tracks descargados y sus certificados de licencia.", soon: true },
-            { title: "Mi plan", desc: "Gestiona tu suscripción y método de pago.", soon: true },
+            { title: "Mis descargas", desc: "Historial de tracks descargados y sus certificados de licencia." },
+            { title: "Mi plan", desc: "Gestiona tu suscripción y método de pago." },
           ].map((c) => (
             <div key={c.title} className="zl-card" style={{ padding: 24 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                 <h3 style={{ fontSize: "1.02rem", fontWeight: 700 }}>{c.title}</h3>
-                {c.soon && <span className="zl-tag">Próximamente</span>}
+                <span className="zl-tag">Próximamente</span>
               </div>
               <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>{c.desc}</p>
             </div>

@@ -13,6 +13,7 @@ export interface Track {
   glyph: string;
   bpm: number;
   duration: string;
+  audioUrl: string | null;
   featured: boolean;
   trending: boolean;
   staffPick: boolean;
