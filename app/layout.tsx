@@ -66,6 +66,17 @@ export const metadata: Metadata = {
   // No appLinks, no apple-app-site-association, no appleWebApp.
 };
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Zoundlist",
+  url: APP_URL,
+  logo: `${APP_URL}/zoundlist-icon.png`,
+  description:
+    "Plataforma de descubrimiento musical: música creada con IA y curada a mano para video, podcast, iglesias y marcas. Licencia incluida en cada descarga.",
+  founder: { "@type": "Organization", name: "JM Creativos LLC" },
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -78,6 +89,10 @@ export default function RootLayout({
         <link
           href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,900&display=swap"
           rel="stylesheet"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
       <body>{children}</body>
