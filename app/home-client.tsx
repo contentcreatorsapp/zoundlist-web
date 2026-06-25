@@ -97,6 +97,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
   const [authEmail, setAuthEmail] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [activeFilter, setActiveFilter] = useState("all");
   const [heroIdx, setHeroIdx] = useState(0);
@@ -165,6 +166,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
   const handleSubmit = async () => {
     setAuthError(null);
     if (!authEmail.trim()) { setAuthError("Escribe tu email."); return; }
+    if (!acceptedTerms) { setAuthError("Debes aceptar los Términos y la Política de Privacidad."); return; }
     if (!isSupabaseConfigured) { setAuthError("Auth aún no configurado: faltan las claves de Supabase."); return; }
     setAuthLoading(true);
     const { error } = await signInWithMagicLink(authEmail.trim(), authName.trim() || undefined);
@@ -173,7 +175,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
     setFormSubmitted(true);
   };
 
-  const closeModal = () => { setModalOpen(false); setAuthError(null); setFormSubmitted(false); };
+  const closeModal = () => { setModalOpen(false); setAuthError(null); setFormSubmitted(false); setAcceptedTerms(false); };
 
   const filtered = activeFilter === "all" ? tracks : tracks.filter((t) => t.genre === activeFilter);
 
@@ -631,7 +633,14 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
                 <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-2)", marginBottom: 6 }}>Nombre</label>
                 <input className="zl-input" type="text" placeholder="Tu nombre" value={authName} onChange={(e) => setAuthName(e.target.value)} style={{ marginBottom: 16 }} />
                 <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-2)", marginBottom: 6 }}>Email</label>
-                <input className="zl-input" type="email" placeholder="tuemail@ejemplo.com" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }} style={{ marginBottom: authError ? 12 : 22 }} />
+                <input className="zl-input" type="email" placeholder="tuemail@ejemplo.com" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }} style={{ marginBottom: 16 }} />
+                <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: "0.8rem", color: "var(--text-2)", lineHeight: 1.5, marginBottom: authError ? 12 : 20, cursor: "pointer" }}>
+                  <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} style={{ marginTop: 2, flexShrink: 0, accentColor: "var(--purple)" }} />
+                  <span>
+                    Acepto los <a href="/terminos" target="_blank" rel="noopener" style={{ color: "var(--purple-2)" }}>Términos de Uso</a>{" "}
+                    y la <a href="/privacidad" target="_blank" rel="noopener" style={{ color: "var(--purple-2)" }}>Política de Privacidad</a>.
+                  </span>
+                </label>
                 {authError && (
                   <p style={{ fontSize: "0.8rem", color: "var(--orange)", marginBottom: 18, lineHeight: 1.45 }}>{authError}</p>
                 )}
