@@ -9,17 +9,24 @@ export class AuthNotConfiguredError extends Error {
 }
 
 /**
- * Passwordless sign-in / sign-up via magic link.
- * Creates the user on first use (shouldCreateUser defaults to true).
+ * Passwordless magic link.
+ * - Sign-up: createUser = true (default) — creates the account on first use.
+ * - Log-in:  createUser = false — only sends a link to existing accounts;
+ *   an unknown email returns an error instead of silently creating one.
  * Browser-only (relies on window.location.origin for the redirect).
  */
-export async function signInWithMagicLink(email: string, fullName?: string) {
+export async function signInWithMagicLink(
+  email: string,
+  fullName?: string,
+  createUser: boolean = true,
+) {
   if (!isSupabaseConfigured) throw new AuthNotConfiguredError();
 
   const supabase = createClient();
   return supabase.auth.signInWithOtp({
     email,
     options: {
+      shouldCreateUser: createUser,
       emailRedirectTo: `${window.location.origin}/auth/callback`,
       data: fullName ? { full_name: fullName } : undefined,
     },
