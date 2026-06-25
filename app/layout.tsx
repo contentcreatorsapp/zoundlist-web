@@ -62,6 +62,11 @@ export const metadata: Metadata = {
     },
   },
 
+  // Google Search Console (URL-prefix): set GOOGLE_SITE_VERIFICATION in Vercel.
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+    : undefined,
+
   // Web-only. No mobile app metadata.
   // No appLinks, no apple-app-site-association, no appleWebApp.
 };
