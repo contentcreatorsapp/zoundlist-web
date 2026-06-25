@@ -168,6 +168,25 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
   const openSignup = () => { setAuthMode("signup"); setAuthError(null); setFormSubmitted(false); setModalOpen(true); };
   const openLogin = () => { setAuthMode("login"); setAuthError(null); setFormSubmitted(false); setModalOpen(true); };
 
+  const [checkoutBusy, setCheckoutBusy] = useState<string | null>(null);
+  const handleCheckout = async (plan: string) => {
+    if (!user) { openSignup(); return; } // must have an account first
+    setCheckoutBusy(plan);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      const data = await res.json();
+      if (data.url) { window.location.href = data.url; return; }
+      alert(data.error || "No se pudo iniciar el pago.");
+    } catch {
+      alert("Error iniciando el pago. Inténtalo de nuevo.");
+    }
+    setCheckoutBusy(null);
+  };
+
   const handleSubmit = async () => {
     setAuthError(null);
     const isSignup = authMode === "signup";
@@ -562,13 +581,13 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           </div>
           <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18 }} className="zl-pricing-grid">
             {[
-              { tier: "Free", color: "var(--text-3)", price: "$0", period: "/mes", note: " ", desc: "Escucha el catálogo completo sin compromiso. Sin tarjeta.", cta: "Explorar gratis", style: "ghost", featured: false,
+              { tier: "Free", planKey: "", color: "var(--text-3)", price: "$0", period: "/mes", note: " ", desc: "Escucha el catálogo completo sin compromiso. Sin tarjeta.", cta: "Explorar gratis", style: "ghost", featured: false,
                 features: [[true, "Preview de 30s de todo"], [false, "Descarga de tracks"], [false, "Certificado de licencia"], [false, "Uso comercial"]] },
-              { tier: "Creator", color: "var(--purple-2)", price: "$9", period: "/mes", note: "$7/mes anual · ahorra $24", desc: "Para creadores que publican de forma regular y necesitan música nueva constante.", cta: "Empezar con Creator", style: "primary", featured: true,
+              { tier: "Creator", planKey: "creator", color: "var(--purple-2)", price: "$9", period: "/mes", note: "$7/mes anual · ahorra $24", desc: "Para creadores que publican de forma regular y necesitan música nueva constante.", cta: "Empezar con Creator", style: "primary", featured: true,
                 features: [[true, "Catálogo completo en MP3"], [true, "Descargas ilimitadas"], [true, "Certificado de licencia PDF"], [true, "YouTube, Podcast, RRSS"], [false, "WAV lossless"], [false, "Anuncios pagados"]] },
-              { tier: "Pro", color: "var(--orange)", price: "$19", period: "/mes", note: "$15/mes anual · ahorra $48", desc: "Para videógrafos y agencias que entregan a clientes y necesitan lossless.", cta: "Empezar con Pro", style: "ghost", featured: false,
+              { tier: "Pro", planKey: "pro", color: "var(--orange)", price: "$19", period: "/mes", note: "$15/mes anual · ahorra $48", desc: "Para videógrafos y agencias que entregan a clientes y necesitan lossless.", cta: "Empezar con Pro", style: "ghost", featured: false,
                 features: [[true, "Todo lo de Creator"], [true, "WAV lossless"], [true, "Licencia comercial completa"], [true, "Anuncios digitales pagados"], [true, "Videos corporativos y apps"], [true, "Prioridad en nuevos tracks"]] },
-              { tier: "Iglesias / ONGs", color: "var(--lime)", price: "$5", period: "/mes", note: "Exclusivo uso no comercial", desc: "Para iglesias y ministerios que producen contenido de culto.", cta: "Plan para iglesias", style: "lime", featured: false,
+              { tier: "Iglesias / ONGs", planKey: "church", color: "var(--lime)", price: "$5", period: "/mes", note: "Exclusivo uso no comercial", desc: "Para iglesias y ministerios que producen contenido de culto.", cta: "Plan para iglesias", style: "lime", featured: false,
                 features: [[true, "Catálogo completo en MP3"], [true, "Descargas ilimitadas"], [true, "Certificado de licencia"], [true, "Cultos, eventos, streaming"], [false, "Uso comercial"], [false, "WAV o broadcast"]] },
             ].map((p) => (
               <div key={p.tier} className={`zl-plan${p.featured ? " is-featured" : ""}`}>
@@ -589,8 +608,9 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
                 </ul>
                 <button
                   className={`zl-btn zl-btn--block ${p.style === "primary" ? "zl-btn--primary" : p.style === "lime" ? "zl-btn--lime" : "zl-btn--ghost"}`}
-                  onClick={() => setModalOpen(true)}
-                >{p.cta}</button>
+                  onClick={() => (p.planKey ? handleCheckout(p.planKey) : openSignup())}
+                  disabled={checkoutBusy === p.planKey && !!p.planKey}
+                >{checkoutBusy === p.planKey && p.planKey ? "Redirigiendo…" : p.cta}</button>
               </div>
             ))}
           </div>

@@ -1,12 +1,19 @@
 import { redirect } from "next/navigation";
-import { getMyProfile } from "@/services/profile";
+import { getMyProfile, isSubscriptionActive } from "@/services/profile";
 import { Brand } from "@/components/brand";
 import { SignOutButton } from "./sign-out-button";
+import { ManageBillingButton } from "./manage-billing-button";
 
 export const metadata = { title: "Mi panel" };
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+const PLAN_NAMES: Record<string, string> = { creator: "Creator", pro: "Pro", church: "Iglesias / ONGs" };
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ checkout?: string }>;
+}) {
   // Degrade gracefully if Supabase isn't configured yet.
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     redirect("/");
@@ -15,7 +22,10 @@ export default async function DashboardPage() {
   const profile = await getMyProfile();
   if (!profile) redirect("/?auth=required");
 
+  const { checkout } = await searchParams;
   const isAdmin = profile.role === "admin";
+  const active = isSubscriptionActive(profile);
+  const planName = profile.plan ? PLAN_NAMES[profile.plan] ?? profile.plan : null;
   const name = profile.fullName || profile.email?.split("@")[0] || "creador";
 
   return (
@@ -39,6 +49,12 @@ export default async function DashboardPage() {
           Tu cuenta está activa. Desde aquí gestionas tus descargas, licencias{isAdmin ? " y la carga de música al catálogo" : ""}.
         </p>
 
+        {checkout === "success" && (
+          <div style={{ marginTop: 24, padding: "14px 18px", borderRadius: "var(--r)", background: "var(--brand-dim)", border: "1px solid rgba(149,249,8,0.3)", color: "var(--text)", fontSize: "0.9rem" }}>
+            ✓ ¡Pago recibido! Tu suscripción se activará en unos segundos. Si no ves el plan aún, refresca la página.
+          </div>
+        )}
+
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 20, marginTop: 40 }}>
           {/* Upload — live for admins */}
           {isAdmin ? (
@@ -59,18 +75,40 @@ export default async function DashboardPage() {
             </div>
           )}
 
-          {[
-            { title: "Mis descargas", desc: "Historial de tracks descargados y sus certificados de licencia." },
-            { title: "Mi plan", desc: "Gestiona tu suscripción y método de pago." },
-          ].map((c) => (
-            <div key={c.title} className="zl-card" style={{ padding: 24 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <h3 style={{ fontSize: "1.02rem", fontWeight: 700 }}>{c.title}</h3>
-                <span className="zl-tag">Próximamente</span>
-              </div>
-              <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>{c.desc}</p>
+          {/* Mi plan — real subscription status */}
+          <div className="zl-card" style={{ padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <h3 style={{ fontSize: "1.02rem", fontWeight: 700 }}>Mi plan</h3>
+              {active
+                ? <span className="zl-pill-new">{planName ?? "Activo"}</span>
+                : <span className="zl-tag">Sin plan</span>}
             </div>
-          ))}
+            {active ? (
+              <>
+                <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>
+                  Tu plan <strong style={{ color: "var(--text)" }}>{planName}</strong> está activo.
+                  {profile.currentPeriodEnd ? ` Se renueva el ${new Date(profile.currentPeriodEnd).toLocaleDateString("es")}.` : ""}
+                </p>
+                <ManageBillingButton />
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>
+                  Aún no tienes una suscripción activa. Elige un plan para descargar con licencia.
+                </p>
+                <a href="/#pricing" className="zl-btn zl-btn--primary zl-btn--sm" style={{ marginTop: 14 }}>Ver planes</a>
+              </>
+            )}
+          </div>
+
+          {/* Mis descargas — coming soon */}
+          <div className="zl-card" style={{ padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <h3 style={{ fontSize: "1.02rem", fontWeight: 700 }}>Mis descargas</h3>
+              <span className="zl-tag">Próximamente</span>
+            </div>
+            <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>Historial de tracks descargados y sus certificados de licencia.</p>
+          </div>
         </div>
       </section>
     </main>
