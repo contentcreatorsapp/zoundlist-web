@@ -27,9 +27,14 @@ export async function POST(req: Request) {
 
   async function syncSubscription(sub: Stripe.Subscription) {
     const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
-    const priceId = sub.items.data[0]?.price.id;
+    const item = sub.items.data[0];
+    const priceId = item?.price.id;
     const plan = priceId ? planForPrice(priceId) : undefined;
-    const periodEnd = (sub as unknown as { current_period_end: number }).current_period_end;
+    // current_period_end moved from the subscription to the item in newer API
+    // versions — read whichever is present.
+    const periodEnd =
+      (sub as unknown as { current_period_end?: number }).current_period_end ??
+      (item as unknown as { current_period_end?: number })?.current_period_end;
 
     await admin
       .from("profiles")
