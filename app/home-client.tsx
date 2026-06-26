@@ -19,6 +19,16 @@ const GENRE_IMAGES: Record<string, string> = {
   podcast:   "/images/Explora%20por%20estilo/Podcast.jpg",
 };
 
+// Mood collection cover images (fixed curated set). Falls back to gradient.
+const MOOD_IMAGES: Record<string, string> = {
+  epico:        "/images/Encuentra%20el%20sentimiento/%C3%89pico.jpg",
+  tranquilo:    "/images/Encuentra%20el%20sentimiento/Tranquilo.jpg",
+  motivacional: "/images/Encuentra%20el%20sentimiento/Motivacional.jpg",
+  melancolico:  "/images/Encuentra%20el%20sentimiento/Melanc%C3%B3lico.jpg",
+  energetico:   "/images/Encuentra%20el%20sentimiento/Energ%C3%A9tico.jpg",
+  reverente:    "/images/Encuentra%20el%20sentimiento/Reverente.jpg",
+};
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 // Deterministic bars (avoids hydration mismatch + flicker)
@@ -507,7 +517,12 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 18 }} className="zl-mood-grid">
             {moods.map((m) => (
               <button key={m.slug} className="zl-collection" style={{ aspectRatio: "3 / 4" }} aria-label={`Mood ${m.name}`}>
-                <div className="zl-collection__bg" style={{ background: COVERS[m.cover] }} />
+                {MOOD_IMAGES[m.slug] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="zl-collection__bg" src={MOOD_IMAGES[m.slug]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <div className="zl-collection__bg" style={{ background: COVERS[m.cover] }} />
+                )}
                 <div className="zl-collection__shade" />
                 <div className="zl-collection__body" style={{ padding: 16 }}>
                   <div style={{ marginTop: "auto" }}>
