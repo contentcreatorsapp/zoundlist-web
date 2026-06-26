@@ -210,6 +210,14 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
 
   const closeModal = () => { setModalOpen(false); setAuthError(null); setFormSubmitted(false); setAcceptedTerms(false); };
 
+  const handleDownload = (track: typeof heroTrack) => {
+    if (!track?.audioUrl) { alert("Este track todavía no tiene un archivo descargable."); return; }
+    if (!user) { openLogin(); return; }
+    // The server validates the active subscription, records the download and
+    // redirects to the file (or to /#pricing if there's no active plan).
+    window.location.href = `/api/download?track=${encodeURIComponent(track.id)}`;
+  };
+
   const filtered = activeFilter === "all" ? tracks : tracks.filter((t) => t.genre === activeFilter);
   const isLogin = authMode === "login";
 
@@ -306,7 +314,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
                   </button>
                   <span style={{ fontSize: "0.8rem", color: "var(--text-3)", fontVariantNumeric: "tabular-nums" }}>{timeDisplay}</span>
                 </div>
-                <button className="zl-btn zl-btn--lime zl-btn--sm" onClick={() => setModalOpen(true)}>Descargar</button>
+                <button className="zl-btn zl-btn--lime zl-btn--sm" onClick={() => handleDownload(heroTrack)}>Descargar</button>
               </div>
 
               <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 6 }}>

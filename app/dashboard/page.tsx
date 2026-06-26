@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getMyProfile, isSubscriptionActive } from "@/services/profile";
+import { getMyDownloads } from "@/services/downloads";
 import { Brand } from "@/components/brand";
 import { SignOutButton } from "./sign-out-button";
 import { ManageBillingButton } from "./manage-billing-button";
@@ -23,6 +24,7 @@ export default async function DashboardPage({
   if (!profile) redirect("/?auth=required");
 
   const { checkout } = await searchParams;
+  const downloads = await getMyDownloads();
   const isAdmin = profile.role === "admin";
   const active = isSubscriptionActive(profile);
   const planName = profile.plan ? PLAN_NAMES[profile.plan] ?? profile.plan : null;
@@ -101,13 +103,29 @@ export default async function DashboardPage({
             )}
           </div>
 
-          {/* Mis descargas — coming soon */}
+          {/* Mis descargas — real history + license certificates */}
           <div className="zl-card" style={{ padding: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
               <h3 style={{ fontSize: "1.02rem", fontWeight: 700 }}>Mis descargas</h3>
-              <span className="zl-tag">Próximamente</span>
+              <span className="zl-tag">{downloads.length}</span>
             </div>
-            <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>Historial de tracks descargados y sus certificados de licencia.</p>
+            {downloads.length === 0 ? (
+              <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>
+                Aún no has descargado nada. Cada descarga genera su certificado de licencia.
+              </p>
+            ) : (
+              <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
+                {downloads.slice(0, 6).map((d) => (
+                  <li key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: "block", fontSize: "0.86rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.trackTitle}</span>
+                      <span style={{ display: "block", fontSize: "0.72rem", color: "var(--text-3)" }}>{d.certificateNumber}</span>
+                    </span>
+                    <a href={`/api/certificate?id=${d.id}`} className="zl-btn zl-btn--ghost zl-btn--sm" style={{ flexShrink: 0 }}>Certificado</a>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </section>
