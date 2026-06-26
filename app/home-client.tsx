@@ -6,7 +6,7 @@ import type { Catalog, CoverVariant } from "@/types/catalog";
 import { COVERS } from "@/lib/catalog/covers";
 import { Brand } from "@/components/brand";
 import { usePlayer } from "@/lib/use-player";
-import { signUpWithPassword, signInWithPassword, resetPassword } from "@/services/auth";
+import { signUpWithPassword, signInWithPassword, resetPassword, signInWithProvider } from "@/services/auth";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 // Genre collection cover images (fixed curated set). Falls back to gradient.
@@ -59,6 +59,45 @@ function Pause({ size = 18 }: { size?: number }) {
 }
 function Arrow() {
   return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>;
+}
+function GoogleIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
+  );
+}
+function AppleIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true">
+      <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
+    </svg>
+  );
+}
+function OAuthButtons({ onProvider }: { onProvider: (p: "google" | "apple") => void }) {
+  const base: React.CSSProperties = {
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%",
+    padding: "11px 16px", borderRadius: "var(--r-sm)", fontFamily: "inherit", fontWeight: 600,
+    fontSize: "0.9rem", cursor: "pointer",
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
+      <button type="button" onClick={() => onProvider("google")} style={{ ...base, background: "#fff", color: "#1f1f1f", border: "none" }}>
+        <GoogleIcon /> Continuar con Google
+      </button>
+      <button type="button" onClick={() => onProvider("apple")} style={{ ...base, background: "#000", color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+        <AppleIcon /> Continuar con Apple
+      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
+        <span style={{ flex: 1, height: 1, background: "var(--border)" }} />
+        <span style={{ fontSize: "0.72rem", color: "var(--text-3)" }}>o con tu email</span>
+        <span style={{ flex: 1, height: 1, background: "var(--border)" }} />
+      </div>
+    </div>
+  );
 }
 
 // ─── Reusable pieces ─────────────────────────────────────────────────────────
@@ -195,6 +234,19 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
   const openSignup = () => { setAuthMode("signup"); resetAuthMsgs(); setModalOpen(true); };
   const openLogin = () => { setAuthMode("login"); resetAuthMsgs(); setModalOpen(true); };
   const switchMode = (m: "signup" | "login" | "forgot") => { setAuthMode(m); resetAuthMsgs(); };
+
+  const handleOAuth = async (provider: "google" | "apple") => {
+    setAuthError(null);
+    if (!isSupabaseConfigured) { setAuthError("Auth aún no configurado."); return; }
+    const { error } = await signInWithProvider(provider);
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes("provider") || msg.includes("not enabled") || msg.includes("unsupported") || msg.includes("disabled")) {
+        setAuthError(`${provider === "google" ? "Google" : "Apple"} aún no está activado. Configúralo en Supabase.`);
+      } else { setAuthError(error.message); }
+    }
+    // On success, signInWithOAuth redirects the browser to the provider.
+  };
 
   const [checkoutBusy, setCheckoutBusy] = useState<string | null>(null);
   const handleCheckout = async (plan: string) => {
@@ -743,6 +795,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
               </div>
             ) : (
               <>
+                {authMode !== "forgot" && <OAuthButtons onProvider={handleOAuth} />}
                 {authMode === "signup" && (
                   <>
                     <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-2)", marginBottom: 6 }}>Nombre</label>

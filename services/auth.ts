@@ -47,6 +47,16 @@ export async function signUpWithPassword(email: string, password: string, fullNa
   });
 }
 
+/** OAuth sign-in/up with a social provider (Google, Apple). Redirects away. */
+export async function signInWithProvider(provider: "google" | "apple") {
+  if (!isSupabaseConfigured) throw new AuthNotConfiguredError();
+  const supabase = createClient();
+  return supabase.auth.signInWithOAuth({
+    provider,
+    options: { redirectTo: `${window.location.origin}/auth/callback` },
+  });
+}
+
 /** Email + password sign-in. */
 export async function signInWithPassword(email: string, password: string) {
   if (!isSupabaseConfigured) throw new AuthNotConfiguredError();
