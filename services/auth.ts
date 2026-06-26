@@ -33,6 +33,43 @@ export async function signInWithMagicLink(
   });
 }
 
+/** Email + password sign-up. Stores full_name in user metadata. */
+export async function signUpWithPassword(email: string, password: string, fullName?: string) {
+  if (!isSupabaseConfigured) throw new AuthNotConfiguredError();
+  const supabase = createClient();
+  return supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: fullName ? { full_name: fullName } : undefined,
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
+    },
+  });
+}
+
+/** Email + password sign-in. */
+export async function signInWithPassword(email: string, password: string) {
+  if (!isSupabaseConfigured) throw new AuthNotConfiguredError();
+  const supabase = createClient();
+  return supabase.auth.signInWithPassword({ email, password });
+}
+
+/** Sends a password-reset email; the link lands on /auth/update-password. */
+export async function resetPassword(email: string) {
+  if (!isSupabaseConfigured) throw new AuthNotConfiguredError();
+  const supabase = createClient();
+  return supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/auth/callback?next=/auth/update-password`,
+  });
+}
+
+/** Updates the current user's password (used on the reset page). */
+export async function updatePassword(password: string) {
+  if (!isSupabaseConfigured) throw new AuthNotConfiguredError();
+  const supabase = createClient();
+  return supabase.auth.updateUser({ password });
+}
+
 export async function signOut() {
   if (!isSupabaseConfigured) throw new AuthNotConfiguredError();
   const supabase = createClient();

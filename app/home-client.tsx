@@ -6,7 +6,7 @@ import type { Catalog, CoverVariant } from "@/types/catalog";
 import { COVERS } from "@/lib/catalog/covers";
 import { Brand } from "@/components/brand";
 import { usePlayer } from "@/lib/use-player";
-import { signInWithMagicLink } from "@/services/auth";
+import { signUpWithPassword, signInWithPassword, resetPassword } from "@/services/auth";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 // Genre collection cover images (fixed curated set). Falls back to gradient.
@@ -121,10 +121,11 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [authName, setAuthName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
+  const [authMode, setAuthMode] = useState<"signup" | "login" | "forgot">("signup");
   const [user, setUser] = useState<User | null>(null);
   const [activeFilter, setActiveFilter] = useState("all");
   const [heroIdx, setHeroIdx] = useState(0);
@@ -190,8 +191,10 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
     ? `${fmt(player.currentTime)} / ${player.duration ? fmt(player.duration) : heroDur}`
     : `0:00 / ${heroDur}`;
 
-  const openSignup = () => { setAuthMode("signup"); setAuthError(null); setFormSubmitted(false); setModalOpen(true); };
-  const openLogin = () => { setAuthMode("login"); setAuthError(null); setFormSubmitted(false); setModalOpen(true); };
+  const resetAuthMsgs = () => { setAuthError(null); setFormSubmitted(false); };
+  const openSignup = () => { setAuthMode("signup"); resetAuthMsgs(); setModalOpen(true); };
+  const openLogin = () => { setAuthMode("login"); resetAuthMsgs(); setModalOpen(true); };
+  const switchMode = (m: "signup" | "login" | "forgot") => { setAuthMode(m); resetAuthMsgs(); };
 
   const [checkoutBusy, setCheckoutBusy] = useState<string | null>(null);
   const handleCheckout = async (plan: string) => {
@@ -214,26 +217,54 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
 
   const handleSubmit = async () => {
     setAuthError(null);
-    const isSignup = authMode === "signup";
-    if (!authEmail.trim()) { setAuthError("Escribe tu email."); return; }
-    if (isSignup && !acceptedTerms) { setAuthError("Debes aceptar los Términos y la Política de Privacidad."); return; }
+    const email = authEmail.trim();
+    if (!email) { setAuthError("Escribe tu email."); return; }
     if (!isSupabaseConfigured) { setAuthError("Auth aún no configurado: faltan las claves de Supabase."); return; }
-    setAuthLoading(true);
-    const { error } = await signInWithMagicLink(authEmail.trim(), isSignup ? (authName.trim() || undefined) : undefined, isSignup);
-    setAuthLoading(false);
-    if (error) {
-      const msg = error.message.toLowerCase();
-      if (!isSignup && (msg.includes("signups not allowed") || msg.includes("not found") || msg.includes("user not found"))) {
-        setAuthError("No encontramos una cuenta con ese email. Crea una cuenta gratis.");
-      } else {
-        setAuthError(error.message);
-      }
+
+    // Forgot password
+    if (authMode === "forgot") {
+      setAuthLoading(true);
+      const { error } = await resetPassword(email);
+      setAuthLoading(false);
+      if (error) { setAuthError(error.message); return; }
+      setFormSubmitted(true);
       return;
     }
-    setFormSubmitted(true);
+
+    const isSignup = authMode === "signup";
+    if (isSignup && !acceptedTerms) { setAuthError("Debes aceptar los Términos y la Política de Privacidad."); return; }
+    if (authPassword.length < 8) { setAuthError("La contraseña debe tener al menos 8 caracteres."); return; }
+
+    setAuthLoading(true);
+    if (isSignup) {
+      const { data, error } = await signUpWithPassword(email, authPassword, authName.trim() || undefined);
+      setAuthLoading(false);
+      if (error) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes("already") || msg.includes("registered")) {
+          setAuthError("Ese email ya tiene cuenta. Inicia sesión.");
+        } else { setAuthError(error.message); }
+        return;
+      }
+      if (data.session) { window.location.href = "/dashboard"; return; } // logged in immediately
+      setFormSubmitted(true); // email confirmation required
+    } else {
+      const { error } = await signInWithPassword(email, authPassword);
+      setAuthLoading(false);
+      if (error) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
+          setAuthError("Email o contraseña incorrectos.");
+        } else if (msg.includes("not confirmed") || msg.includes("confirm")) {
+          setAuthError("Confirma tu email antes de entrar (revisa tu correo).");
+        } else { setAuthError(error.message); }
+        return;
+      }
+      window.location.href = "/dashboard";
+    }
   };
 
-  const closeModal = () => { setModalOpen(false); setAuthError(null); setFormSubmitted(false); setAcceptedTerms(false); };
+  const closeModal = () => { setModalOpen(false); setAuthError(null); setFormSubmitted(false); setAcceptedTerms(false); setAuthPassword(""); };
 
   const handleDownload = (track: typeof heroTrack) => {
     if (!track?.audioUrl) { alert("Este track todavía no tiene un archivo descargable."); return; }
@@ -244,7 +275,6 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
   };
 
   const filtered = activeFilter === "all" ? tracks : tracks.filter((t) => t.genre === activeFilter);
-  const isLogin = authMode === "login";
 
   return (
     <>
@@ -692,22 +722,28 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <div className="zl-modal">
             <button className="zl-modal__close" onClick={closeModal} aria-label="Cerrar">✕</button>
             <h3 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: 8, letterSpacing: "-0.02em" }}>
-              {isLogin ? "Bienvenido de vuelta" : "Escucha el catálogo completo"}
+              {authMode === "login" ? "Bienvenido de vuelta" : authMode === "forgot" ? "Recuperar contraseña" : "Crea tu cuenta"}
             </h3>
             <p style={{ fontSize: "0.9rem", color: "var(--text-2)", marginBottom: 24 }}>
-              {isLogin ? "Inicia sesión con tu email. Te enviamos un enlace de acceso, sin contraseñas." : "Crea tu cuenta gratis y accede a todo. Sin tarjeta, sin compromiso."}
+              {authMode === "login"
+                ? "Entra con tu email y contraseña."
+                : authMode === "forgot"
+                  ? "Te enviaremos un enlace para crear una contraseña nueva."
+                  : "Regístrate para escuchar, descargar y licenciar música."}
             </p>
             {formSubmitted ? (
               <div style={{ textAlign: "center", padding: "20px 4px" }}>
                 <div style={{ fontSize: "2rem", marginBottom: 10 }}>📬</div>
-                <div style={{ color: "var(--lime)", fontWeight: 700, marginBottom: 6 }}>Revisa tu email</div>
+                <div style={{ color: "var(--brand)", fontWeight: 700, marginBottom: 6 }}>Revisa tu email</div>
                 <p style={{ fontSize: "0.85rem", color: "var(--text-2)", lineHeight: 1.55 }}>
-                  Te enviamos un enlace de acceso a <strong style={{ color: "var(--text)" }}>{authEmail}</strong>. Ábrelo para entrar a tu panel.
+                  {authMode === "forgot"
+                    ? <>Te enviamos un enlace para restablecer tu contraseña a <strong style={{ color: "var(--text)" }}>{authEmail}</strong>.</>
+                    : <>Te enviamos un email de confirmación a <strong style={{ color: "var(--text)" }}>{authEmail}</strong>. Ábrelo para activar tu cuenta y luego inicia sesión.</>}
                 </p>
               </div>
             ) : (
               <>
-                {!isLogin && (
+                {authMode === "signup" && (
                   <>
                     <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-2)", marginBottom: 6 }}>Nombre</label>
                     <input className="zl-input" type="text" placeholder="Tu nombre" value={authName} onChange={(e) => setAuthName(e.target.value)} style={{ marginBottom: 16 }} />
@@ -715,27 +751,36 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
                 )}
                 <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-2)", marginBottom: 6 }}>Email</label>
                 <input className="zl-input" type="email" placeholder="tuemail@ejemplo.com" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }} style={{ marginBottom: 16 }} />
-                {!isLogin && (
+                {authMode !== "forgot" && (
+                  <>
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
+                      <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-2)" }}>Contraseña</label>
+                      {authMode === "login" && (
+                        <button onClick={() => switchMode("forgot")} style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer", fontFamily: "inherit", fontSize: "0.75rem", padding: 0 }}>¿La olvidaste?</button>
+                      )}
+                    </div>
+                    <input className="zl-input" type="password" placeholder={authMode === "signup" ? "Mínimo 8 caracteres" : "Tu contraseña"} value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }} style={{ marginBottom: 16 }} />
+                  </>
+                )}
+                {authMode === "signup" && (
                   <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: "0.8rem", color: "var(--text-2)", lineHeight: 1.5, marginBottom: authError ? 12 : 20, cursor: "pointer" }}>
-                    <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} style={{ marginTop: 2, flexShrink: 0, accentColor: "var(--purple)" }} />
+                    <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} style={{ marginTop: 2, flexShrink: 0, accentColor: "var(--brand)" }} />
                     <span>
-                      Acepto los <a href="/terminos" target="_blank" rel="noopener" style={{ color: "var(--purple-2)" }}>Términos de Uso</a>{" "}
-                      y la <a href="/privacidad" target="_blank" rel="noopener" style={{ color: "var(--purple-2)" }}>Política de Privacidad</a>.
+                      Acepto los <a href="/terminos" target="_blank" rel="noopener" style={{ color: "var(--brand)" }}>Términos de Uso</a>{" "}
+                      y la <a href="/privacidad" target="_blank" rel="noopener" style={{ color: "var(--brand)" }}>Política de Privacidad</a>.
                     </span>
                   </label>
                 )}
                 {authError && (
-                  <p style={{ fontSize: "0.8rem", color: "var(--orange)", margin: `${isLogin ? "4px" : "0"} 0 16px`, lineHeight: 1.45 }}>{authError}</p>
+                  <p style={{ fontSize: "0.8rem", color: "var(--orange)", margin: "4px 0 16px", lineHeight: 1.45 }}>{authError}</p>
                 )}
                 <button className="zl-btn zl-btn--primary zl-btn--block" onClick={handleSubmit} disabled={authLoading}>
-                  {authLoading ? "Enviando…" : <>{isLogin ? "Enviar enlace de acceso" : "Crear cuenta gratis"} <Arrow /></>}
+                  {authLoading ? "Un momento…" : <>{authMode === "login" ? "Iniciar sesión" : authMode === "forgot" ? "Enviar enlace" : "Crear cuenta"} <Arrow /></>}
                 </button>
                 <p style={{ textAlign: "center", fontSize: "0.8rem", color: "var(--text-3)", marginTop: 16 }}>
-                  {isLogin ? (
-                    <>¿No tienes cuenta? <button onClick={openSignup} style={{ background: "none", border: "none", color: "var(--purple-2)", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit", padding: 0 }}>Crea una gratis</button></>
-                  ) : (
-                    <>¿Ya tienes cuenta? <button onClick={openLogin} style={{ background: "none", border: "none", color: "var(--purple-2)", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit", padding: 0 }}>Inicia sesión</button></>
-                  )}
+                  {authMode === "login" && (<>¿No tienes cuenta? <button onClick={() => switchMode("signup")} style={{ background: "none", border: "none", color: "var(--brand)", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit", padding: 0 }}>Crea una</button></>)}
+                  {authMode === "signup" && (<>¿Ya tienes cuenta? <button onClick={() => switchMode("login")} style={{ background: "none", border: "none", color: "var(--brand)", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit", padding: 0 }}>Inicia sesión</button></>)}
+                  {authMode === "forgot" && (<>¿La recordaste? <button onClick={() => switchMode("login")} style={{ background: "none", border: "none", color: "var(--brand)", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit", padding: 0 }}>Volver a iniciar sesión</button></>)}
                 </p>
               </>
             )}
