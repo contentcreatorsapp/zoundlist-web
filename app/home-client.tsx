@@ -9,6 +9,16 @@ import { usePlayer } from "@/lib/use-player";
 import { signInWithMagicLink } from "@/services/auth";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
+// Genre collection cover images (fixed curated set). Falls back to gradient.
+const GENRE_IMAGES: Record<string, string> = {
+  cinematic: "/images/categorias/Explora%20por%20estilo/Cinematic.jpg",
+  lofi:      "/images/categorias/Explora%20por%20estilo/Lo-fi.jpg",
+  worship:   "/images/categorias/Explora%20por%20estilo/Worship.jpg",
+  corporate: "/images/categorias/Explora%20por%20estilo/Corporate.jpg",
+  social:    "/images/categorias/Explora%20por%20estilo/Social.jpg",
+  podcast:   "/images/categorias/Explora%20por%20estilo/Podcast.jpg",
+};
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 // Deterministic bars (avoids hydration mismatch + flicker)
@@ -470,7 +480,12 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 22 }} className="zl-coll-grid">
             {genres.map((g) => (
               <button key={g.slug} className="zl-collection" onClick={() => { setActiveFilter(g.slug); document.getElementById("catalog")?.scrollIntoView({ behavior: "smooth" }); }} aria-label={`Colección ${g.name}`}>
-                <div className="zl-collection__bg" style={{ background: COVERS[g.cover] }} />
+                {GENRE_IMAGES[g.slug] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="zl-collection__bg" src={GENRE_IMAGES[g.slug]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <div className="zl-collection__bg" style={{ background: COVERS[g.cover] }} />
+                )}
                 <div className="zl-collection__shade" />
                 <div className="zl-collection__body">
                   <span style={{ fontSize: "1.4rem" }}>{g.glyph}</span>
