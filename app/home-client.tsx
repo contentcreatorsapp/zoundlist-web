@@ -11,12 +11,12 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 // Genre collection cover images (fixed curated set). Falls back to gradient.
 const GENRE_IMAGES: Record<string, string> = {
-  cinematic: "/images/categorias/Explora%20por%20estilo/Cinematic.jpg",
-  lofi:      "/images/categorias/Explora%20por%20estilo/Lo-fi.jpg",
-  worship:   "/images/categorias/Explora%20por%20estilo/Worship.jpg",
-  corporate: "/images/categorias/Explora%20por%20estilo/Corporate.jpg",
-  social:    "/images/categorias/Explora%20por%20estilo/Social.jpg",
-  podcast:   "/images/categorias/Explora%20por%20estilo/Podcast.jpg",
+  cinematic: "/images/Explora%20por%20estilo/Cinematic.jpg",
+  lofi:      "/images/Explora%20por%20estilo/LO-fi.jpg",
+  worship:   "/images/Explora%20por%20estilo/Worship.jpg",
+  corporate: "/images/Explora%20por%20estilo/Corporate.jpg",
+  social:    "/images/Explora%20por%20estilo/Socialjpg.jpg",
+  podcast:   "/images/Explora%20por%20estilo/Podcast.jpg",
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
