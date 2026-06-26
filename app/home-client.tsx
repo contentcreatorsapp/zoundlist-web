@@ -43,12 +43,17 @@ function Arrow() {
 
 // ─── Reusable pieces ─────────────────────────────────────────────────────────
 
-function Cover({ variant, glyph, radius }: { variant: CoverVariant; glyph?: string; radius?: number }) {
+function Cover({ variant, glyph, radius, image }: { variant: CoverVariant; glyph?: string; radius?: number; image?: string | null }) {
   return (
     <div className="zl-cover" style={radius ? { borderRadius: radius } : undefined}>
-      <div style={{ position: "absolute", inset: 0, background: COVERS[variant] }} />
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={image} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+      ) : (
+        <div style={{ position: "absolute", inset: 0, background: COVERS[variant] }} />
+      )}
       <div className="zl-cover__vignette" />
-      {glyph && <span className="zl-cover__glyph">{glyph}</span>}
+      {!image && glyph && <span className="zl-cover__glyph">{glyph}</span>}
     </div>
   );
 }
@@ -287,7 +292,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
             <div className="zl-card" style={{ padding: 24, position: "relative", overflow: "hidden" }}>
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(149,249,8,0.6), transparent)" }} />
               <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 20 }}>
-                <div style={{ width: 64, height: 64 }}><Cover variant={heroTrack.cover} glyph={heroTrack.glyph} radius={14} /></div>
+                <div style={{ width: 64, height: 64 }}><Cover variant={heroTrack.cover} glyph={heroTrack.glyph} radius={14} image={heroTrack.coverImage} /></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: "0.7rem", color: "var(--text-3)", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600 }}>{heroOn && player.isPlaying ? "Sonando ahora" : "En el reproductor"}</div>
                   <div style={{ fontSize: "1.05rem", fontWeight: 700, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{heroTrack.title}</div>
@@ -325,7 +330,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
                       <span style={{ width: 16, textAlign: "center", fontSize: "0.75rem", color: on ? "var(--lime)" : "var(--text-3)" }}>
                         {on && player.isPlaying ? "♪" : i + 1}
                       </span>
-                      <div style={{ width: 34, height: 34 }}><Cover variant={t.cover} radius={8} /></div>
+                      <div style={{ width: 34, height: 34 }}><Cover variant={t.cover} radius={8} image={t.coverImage} /></div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: "0.85rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.title}</div>
                         <div style={{ fontSize: "0.72rem", color: "var(--text-3)" }}>{t.artist}</div>
@@ -347,7 +352,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <div className="zl-rail" data-reveal>
             {featured.map((t) => (
               <button key={t.id} className="zl-release" onClick={() => player.toggle(t)} aria-label={`Reproducir ${t.title}`}>
-                <Cover variant={t.cover} glyph={t.glyph} />
+                <Cover variant={t.cover} glyph={t.glyph} image={t.coverImage} />
                 <ReleasePlay on={player.playingId === t.id} playing={player.isPlaying} />
                 <div className="zl-release__title">{t.title}</div>
                 <div className="zl-release__meta">{t.artist} · {t.mood}</div>
@@ -367,7 +372,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
               return (
                 <button key={t.id} className={`zl-track${on ? " is-playing" : ""}`} onClick={() => player.toggle(t)} aria-label={`Reproducir ${t.title}`}>
                   <span className="zl-track__rank">{on ? (player.isPlaying ? <Pause size={13} /> : <Play size={13} />) : i + 1}</span>
-                  <span className="zl-track__cover"><Cover variant={t.cover} glyph={t.glyph} radius={10} /></span>
+                  <span className="zl-track__cover"><Cover variant={t.cover} glyph={t.glyph} radius={10} image={t.coverImage} /></span>
                   <span style={{ minWidth: 0 }}>
                     <span className="zl-track__title" style={{ display: "block" }}>{t.title}</span>
                     <span className="zl-track__meta" style={{ display: "block" }}>{t.artist} · {t.bpm} BPM · {t.mood}</span>
@@ -389,7 +394,12 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
             {/* Hero pick */}
             <button className="zl-release" onClick={() => player.toggle(staffHero)} style={{ position: "relative" }} aria-label={`Reproducir ${staffHero.title}`}>
               <div style={{ position: "relative", borderRadius: "var(--r-lg)", overflow: "hidden", aspectRatio: "16 / 11" }}>
-                <div style={{ position: "absolute", inset: 0, background: COVERS[staffHero.cover] }} />
+                {staffHero.coverImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={staffHero.coverImage} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <div style={{ position: "absolute", inset: 0, background: COVERS[staffHero.cover] }} />
+                )}
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 35%, rgba(0,0,0,0.78))" }} />
                 <span className="zl-release__play" style={{ width: 56, height: 56, ...(player.playingId === staffHero.id ? { opacity: 1, transform: "translateY(0) scale(1)" } : {}) }}>{player.playingId === staffHero.id && player.isPlaying ? <Pause size={22} /> : <Play size={22} />}</span>
                 <div style={{ position: "absolute", left: 26, bottom: 24, right: 26 }}>
@@ -417,7 +427,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
                   return (
                     <button key={t.id} className={`zl-track${on ? " is-playing" : ""}`} onClick={() => player.toggle(t)} style={{ gridTemplateColumns: "26px 46px 1fr auto" }} aria-label={`Reproducir ${t.title}`}>
                       <span className="zl-track__rank">{on ? (player.isPlaying ? <Pause size={12} /> : <Play size={12} />) : i + 1}</span>
-                      <span style={{ width: 46, height: 46 }}><Cover variant={t.cover} glyph={t.glyph} radius={9} /></span>
+                      <span style={{ width: 46, height: 46 }}><Cover variant={t.cover} glyph={t.glyph} radius={9} image={t.coverImage} /></span>
                       <span style={{ minWidth: 0 }}>
                         <span className="zl-track__title" style={{ display: "block" }}>{t.title}</span>
                         <span className="zl-track__meta" style={{ display: "block" }}>{t.artist} · {t.mood}</span>
@@ -441,7 +451,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
             {newMusic.map((t) => (
               <button key={t.id} className="zl-release" onClick={() => player.toggle(t)} aria-label={`Reproducir ${t.title}`}>
                 <div style={{ position: "relative" }}>
-                  <Cover variant={t.cover} glyph={t.glyph} />
+                  <Cover variant={t.cover} glyph={t.glyph} image={t.coverImage} />
                   <span className="zl-pill-new" style={{ position: "absolute", top: 12, left: 12 }}>Nuevo</span>
                   <ReleasePlay on={player.playingId === t.id} playing={player.isPlaying} />
                 </div>
@@ -508,7 +518,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 24 }}>
             {filtered.map((t) => (
               <button key={t.id} className="zl-release" onClick={() => player.toggle(t)} aria-label={`Reproducir ${t.title}`}>
-                <Cover variant={t.cover} glyph={t.glyph} />
+                <Cover variant={t.cover} glyph={t.glyph} image={t.coverImage} />
                 <ReleasePlay on={player.playingId === t.id} playing={player.isPlaying} />
                 <div className="zl-release__title">{t.title}</div>
                 <div className="zl-release__meta">{t.artist} · {t.bpm} BPM · {t.duration}</div>

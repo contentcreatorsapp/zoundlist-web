@@ -19,6 +19,7 @@ function mapTrack(r: any): Track {
     genre: r.genre_slug,
     mood: r.mood,
     cover: r.cover as CoverVariant,
+    coverImage: r.cover_image ?? null,
     glyph: r.glyph ?? "🎵",
     bpm: r.bpm ?? 0,
     duration: r.duration ?? "",

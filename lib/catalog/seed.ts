@@ -6,7 +6,7 @@ const STAFF_NOTE =
 // Default flags so each track only declares what's true.
 function t(p: Partial<Track> & Pick<Track, "id" | "title" | "artist" | "genre" | "mood" | "cover" | "glyph" | "bpm" | "duration">): Track {
   return {
-    audioUrl: null,
+    audioUrl: null, coverImage: null,
     featured: false, trending: false, staffPick: false, staffHero: false, isNew: false, staffNote: null,
     ...p,
   };

@@ -31,9 +31,16 @@ export function UploadForm({ genres, moods }: { genres: Genre[]; moods: Mood[] }
   const [isNew, setIsNew] = useState(true);
   const [featured, setFeatured] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
   const [status, setStatus] = useState<"idle" | "uploading" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
+
+  const onCoverFile = (f: File | null) => {
+    setCoverFile(f);
+    setCoverPreview(f ? URL.createObjectURL(f) : null);
+  };
 
   const onFile = (f: File | null) => {
     setFile(f);
@@ -55,7 +62,7 @@ export function UploadForm({ genres, moods }: { genres: Genre[]; moods: Mood[] }
 
   const reset = () => {
     setTitle(""); setArtist(""); setBpm(""); setDuration(""); setGlyph("🎵");
-    setIsNew(true); setFeatured(false); setFile(null); setStatus("idle"); setError(null);
+    setIsNew(true); setFeatured(false); setFile(null); setCoverFile(null); setCoverPreview(null); setStatus("idle"); setError(null);
   };
 
   const handleSubmit = async () => {
@@ -77,6 +84,19 @@ export function UploadForm({ genres, moods }: { genres: Genre[]; moods: Mood[] }
     }
     const publicUrl = supabase.storage.from("tracks").getPublicUrl(path).data.publicUrl;
 
+    // 1b. Optional cover image → covers bucket
+    let coverUrl: string | null = null;
+    if (coverFile) {
+      const cext = coverFile.name.split(".").pop()?.toLowerCase() || "jpg";
+      const cpath = `${Date.now()}-${base}.${cext}`;
+      const cup = await supabase.storage.from("covers").upload(cpath, coverFile, { cacheControl: "3600", upsert: false });
+      if (cup.error) {
+        setStatus("idle");
+        return setError(`Error subiendo la portada: ${cup.error.message}`);
+      }
+      coverUrl = supabase.storage.from("covers").getPublicUrl(cpath).data.publicUrl;
+    }
+
     // 2. Insert track row (retry slug on unique violation)
     const genreName = genres.find((g) => g.slug === genre)?.name ?? genre;
     const row = (slug: string) => ({
@@ -90,6 +110,7 @@ export function UploadForm({ genres, moods }: { genres: Genre[]; moods: Mood[] }
       bpm: bpm ? Number(bpm) : null,
       duration: duration || null,
       audio_path: publicUrl,
+      cover_image: coverUrl,
       is_new: isNew,
       featured,
       published: true,
@@ -139,6 +160,17 @@ export function UploadForm({ genres, moods }: { genres: Genre[]; moods: Mood[] }
           style={{ padding: 10 }}
         />
         {file && <p style={{ fontSize: "0.78rem", color: "var(--text-3)", marginTop: 6 }}>{file.name} · {(file.size / 1_000_000).toFixed(1)} MB{duration ? ` · ${duration}` : ""}</p>}
+      </div>
+
+      {/* Cover image (optional) */}
+      <div style={fieldStyle}>
+        <label style={labelStyle}>Portada (imagen cuadrada, opcional — recomendado 1000×1000)</label>
+        <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {coverPreview && <img src={coverPreview} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 12, border: "1px solid var(--border)", flexShrink: 0 }} />}
+          <input className="zl-input" type="file" accept="image/*" onChange={(e) => onCoverFile(e.target.files?.[0] ?? null)} style={{ padding: 10 }} />
+        </div>
+        <p style={{ fontSize: "0.78rem", color: "var(--text-3)", marginTop: 6 }}>Si no subes imagen, se usa el gradiente que elijas abajo.</p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>

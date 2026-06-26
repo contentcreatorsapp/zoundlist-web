@@ -10,6 +10,7 @@ export interface Track {
   genre: string;        // genre slug
   mood: string;         // display label, e.g. "Épico"
   cover: CoverVariant;
+  coverImage: string | null;
   glyph: string;
   bpm: number;
   duration: string;
