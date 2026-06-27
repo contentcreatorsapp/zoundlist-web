@@ -98,6 +98,7 @@ export function UploadForm({ genres, moods }: { genres: Genre[]; moods: Mood[] }
     }
 
     // 2. Insert track row (retry slug on unique violation)
+    const { data: { user } } = await supabase.auth.getUser();
     const genreName = genres.find((g) => g.slug === genre)?.name ?? genre;
     const row = (slug: string) => ({
       slug,
@@ -114,6 +115,7 @@ export function UploadForm({ genres, moods }: { genres: Genre[]; moods: Mood[] }
       is_new: isNew,
       featured,
       published: true,
+      uploader_id: user?.id ?? null,
       sort_order: Math.floor(Date.now() / 1000),
     });
 

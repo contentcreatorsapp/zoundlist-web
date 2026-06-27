@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
 import { getMyProfile, isSubscriptionActive, canUpload } from "@/services/profile";
 import { getMyDownloads } from "@/services/downloads";
+import { getMyTracksWithStats } from "@/services/producer";
 import { Brand } from "@/components/brand";
 import { SignOutButton } from "./sign-out-button";
 import { ManageBillingButton } from "./manage-billing-button";
+import { COVERS } from "@/lib/catalog/covers";
 
 export const metadata = { title: "Mi panel · Zoundlist" };
 export const dynamic = "force-dynamic";
@@ -23,7 +25,10 @@ export default async function DashboardPage({
   if (!profile) redirect("/?auth=required");
 
   const { checkout } = await searchParams;
-  const downloads = await getMyDownloads();
+  const [downloads, myTracks] = await Promise.all([
+    getMyDownloads(),
+    canUpload(profile) ? getMyTracksWithStats() : Promise.resolve([]),
+  ]);
   const isAdmin = profile.role === "admin";
   const isProducer = profile.role === "producer";
   const uploaderAccess = canUpload(profile);
@@ -204,6 +209,60 @@ export default async function DashboardPage({
           </div>
 
         </div>
+
+        {/* Mis tracks — solo productores/admins */}
+        {uploaderAccess && (
+          <div style={{ marginTop: 40 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <h2 style={{ fontSize: "1.15rem", fontWeight: 700 }}>
+                Mis tracks <span style={{ fontSize: "0.82rem", fontWeight: 400, color: "var(--text-3)", marginLeft: 8 }}>{myTracks.length} publicados</span>
+              </h2>
+              <a href="/dashboard/upload" className="zl-btn zl-btn--primary zl-btn--sm">+ Subir track</a>
+            </div>
+
+            {myTracks.length === 0 ? (
+              <div className="zl-card" style={{ padding: "32px 24px", textAlign: "center" }}>
+                <p className="zl-muted" style={{ marginBottom: 16 }}>Aún no has subido ningún track. ¡Empieza ahora!</p>
+                <a href="/dashboard/upload" className="zl-btn zl-btn--primary zl-btn--sm">Subir primer track</a>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {myTracks.map((track) => (
+                  <div key={track.id} className="zl-card" style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 16 }}>
+                    {/* Cover */}
+                    <div style={{
+                      width: 48, height: 48, borderRadius: 10, flexShrink: 0, overflow: "hidden",
+                      background: track.coverImage ? `url(${track.coverImage}) center/cover no-repeat` : COVERS[track.cover],
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem",
+                    }}>
+                      {!track.coverImage && track.glyph}
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontWeight: 600, fontSize: "0.92rem", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{track.title}</p>
+                      <p style={{ fontSize: "0.75rem", color: "var(--text-3)", margin: "3px 0 0" }}>
+                        {track.genre} · {track.mood} {track.bpm ? `· ${track.bpm} BPM` : ""} {track.duration ? `· ${track.duration}` : ""}
+                      </p>
+                    </div>
+
+                    {/* Stats */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 18, flexShrink: 0 }}>
+                      <div style={{ textAlign: "center" }}>
+                        <p style={{ fontSize: "1rem", fontWeight: 700, margin: 0, color: track.downloadCount > 0 ? "var(--brand)" : "var(--text-3)" }}>{track.downloadCount}</p>
+                        <p style={{ fontSize: "0.68rem", color: "var(--text-3)", margin: 0 }}>descargas</p>
+                      </div>
+                      <span className={track.published ? "zl-pill-new" : "zl-tag"} style={{ fontSize: "0.7rem" }}>
+                        {track.published ? "Publicado" : "Borrador"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
       </section>
     </main>
   );
