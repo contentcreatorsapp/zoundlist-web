@@ -73,7 +73,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           )}
 
           {/* Social links */}
-          {(artist.instagram || artist.spotify || artist.website) && (
+          {(artist.instagram || artist.youtube || artist.website) && (
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {artist.instagram && (
                 <a
@@ -86,9 +86,9 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
                   @{artist.instagram}
                 </a>
               )}
-              {artist.spotify && (
+              {artist.youtube && (
                 <a
-                  href={artist.spotify.startsWith("http") ? artist.spotify : `https://youtube.com/@${artist.spotify}`}
+                  href={artist.youtube.startsWith("http") ? artist.youtube : `https://youtube.com/@${artist.youtube}`}
                   target="_blank" rel="noopener noreferrer"
                   className="zl-btn zl-btn--ghost zl-btn--sm"
                   style={{ display: "flex", alignItems: "center", gap: 7 }}

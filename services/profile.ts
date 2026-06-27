@@ -14,7 +14,7 @@ export interface Profile {
   avatarUrl: string | null;
   bannerUrl: string | null;
   instagram: string | null;
-  spotify: string | null;
+  youtube: string | null;
   website: string | null;
   artistSlug: string | null;
 }
@@ -36,7 +36,7 @@ export async function getMyProfile(): Promise<Profile | null> {
 
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, role, plan, subscription_status, current_period_end, artist_name, bio, avatar_url, banner_url, instagram, spotify, website, artist_slug")
+    .select("id, full_name, role, plan, subscription_status, current_period_end, artist_name, bio, avatar_url, banner_url, instagram, youtube, website, artist_slug")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -53,7 +53,7 @@ export async function getMyProfile(): Promise<Profile | null> {
     avatarUrl: (data?.avatar_url as string) ?? null,
     bannerUrl: (data?.banner_url as string) ?? null,
     instagram: (data?.instagram as string) ?? null,
-    spotify: (data?.spotify as string) ?? null,
+    youtube: (data?.youtube as string) ?? null,
     website: (data?.website as string) ?? null,
     artistSlug: (data?.artist_slug as string) ?? null,
   };
@@ -63,7 +63,7 @@ export async function getPublicArtist(slug: string): Promise<Profile | null> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, role, artist_name, bio, avatar_url, banner_url, instagram, spotify, website, artist_slug")
+    .select("id, full_name, role, artist_name, bio, avatar_url, banner_url, instagram, youtube, website, artist_slug")
     .eq("artist_slug", slug)
     .in("role", ["admin", "producer"])
     .maybeSingle();
@@ -83,7 +83,7 @@ export async function getPublicArtist(slug: string): Promise<Profile | null> {
     avatarUrl: (data.avatar_url as string) ?? null,
     bannerUrl: (data.banner_url as string) ?? null,
     instagram: (data.instagram as string) ?? null,
-    spotify: (data.spotify as string) ?? null,
+    youtube: (data.youtube as string) ?? null,
     website: (data.website as string) ?? null,
     artistSlug: (data.artist_slug as string) ?? null,
   };

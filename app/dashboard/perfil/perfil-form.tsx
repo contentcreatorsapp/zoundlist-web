@@ -13,7 +13,7 @@ export function PerfilForm({ profile }: { profile: Profile }) {
   const [artistName, setArtistName] = useState(profile.artistName ?? "");
   const [bio, setBio] = useState(profile.bio ?? "");
   const [instagram, setInstagram] = useState(profile.instagram ?? "");
-  const [spotify, setSpotify] = useState(profile.spotify ?? "");
+  const [youtube, setYoutube] = useState(profile.youtube ?? "");
   const [website, setWebsite] = useState(profile.website ?? "");
 
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl ?? "");
@@ -67,7 +67,7 @@ export function PerfilForm({ profile }: { profile: Profile }) {
         avatar_url: avatarUrl || null,
         banner_url: bannerUrl || null,
         instagram: instagram.replace(/^@/, "").trim() || null,
-        spotify: spotify.trim() || null,
+        youtube: youtube.trim() || null,
         website: website.trim() || null,
         artist_slug: slug || null,
       }).eq("id", profile.id);
@@ -165,7 +165,7 @@ export function PerfilForm({ profile }: { profile: Profile }) {
           </div>
           <div style={field}>
             <label style={label}>YouTube</label>
-            <input className="zl-input" type="text" placeholder="URL de tu canal en YouTube" value={spotify} onChange={e => setSpotify(e.target.value)} />
+            <input className="zl-input" type="text" placeholder="URL de tu canal en YouTube" value={youtube} onChange={e => setYoutube(e.target.value)} />
           </div>
         </div>
 
