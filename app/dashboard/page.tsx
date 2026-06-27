@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
-import { getMyProfile, isSubscriptionActive } from "@/services/profile";
+import { getMyProfile, isSubscriptionActive, canUpload } from "@/services/profile";
 import { getMyDownloads } from "@/services/downloads";
 import { Brand } from "@/components/brand";
 import { SignOutButton } from "./sign-out-button";
 import { ManageBillingButton } from "./manage-billing-button";
 
-export const metadata = { title: "Mi panel" };
+export const metadata = { title: "Mi panel · Zoundlist" };
 export const dynamic = "force-dynamic";
 
 const PLAN_NAMES: Record<string, string> = { creator: "Creator", pro: "Pro", church: "Iglesias / ONGs" };
@@ -15,7 +15,6 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ checkout?: string }>;
 }) {
-  // Degrade gracefully if Supabase isn't configured yet.
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     redirect("/");
   }
@@ -26,9 +25,11 @@ export default async function DashboardPage({
   const { checkout } = await searchParams;
   const downloads = await getMyDownloads();
   const isAdmin = profile.role === "admin";
+  const isProducer = profile.role === "producer";
+  const uploaderAccess = canUpload(profile);
   const active = isSubscriptionActive(profile);
   const planName = profile.plan ? PLAN_NAMES[profile.plan] ?? profile.plan : null;
-  const name = profile.fullName || profile.email?.split("@")[0] || "creador";
+  const displayName = profile.artistName || profile.fullName || profile.email?.split("@")[0] || "artista";
 
   return (
     <main style={{ position: "relative", zIndex: 1, minHeight: "100vh" }}>
@@ -38,46 +39,120 @@ export default async function DashboardPage({
           <Brand height={22} />
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             {isAdmin && <span className="zl-tag" style={{ color: "var(--brand)", borderColor: "rgba(149,249,8,0.3)" }}>Admin</span>}
+            {isProducer && <span className="zl-tag" style={{ color: "var(--brand)", borderColor: "rgba(149,249,8,0.3)" }}>Productor</span>}
             <span style={{ fontSize: "0.85rem", color: "var(--text-2)" }} className="zl-hide-md">{profile.email}</span>
             <SignOutButton />
           </div>
         </div>
       </header>
 
-      <section className="zl-wrap" style={{ paddingTop: 56, paddingBottom: 80 }}>
-        <span className="zl-eyebrow">Tu panel</span>
-        <h1 className="zl-h2" style={{ margin: "12px 0 10px" }}>Hola, {name} 👋</h1>
-        <p className="zl-muted" style={{ maxWidth: 520 }}>
-          Tu cuenta está activa. Desde aquí gestionas tus descargas, licencias{isAdmin ? " y la carga de música al catálogo" : ""}.
-        </p>
+      {/* Producer profile banner */}
+      {uploaderAccess && (
+        <div style={{ position: "relative", width: "100%", height: 180, overflow: "hidden" }}>
+          <div style={{
+            position: "absolute", inset: 0,
+            background: profile.bannerUrl
+              ? `url(${profile.bannerUrl}) center/cover no-repeat`
+              : "linear-gradient(135deg, #0d1a06 0%, #0f0f0f 50%, #091510 100%)",
+          }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 30%, rgba(13,13,13,0.95) 100%)" }} />
+        </div>
+      )}
+
+      <section className="zl-wrap" style={{ paddingTop: uploaderAccess ? 0 : 56, paddingBottom: 80 }}>
+
+        {/* Producer identity block */}
+        {uploaderAccess && (
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 20, marginTop: -44, marginBottom: 40, position: "relative", zIndex: 2 }}>
+            <div style={{
+              width: 88, height: 88, borderRadius: "50%", flexShrink: 0,
+              border: "4px solid var(--bg)", overflow: "hidden",
+              background: profile.avatarUrl ? `url(${profile.avatarUrl}) center/cover no-repeat` : "var(--surface)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              {!profile.avatarUrl && (
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="1.2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+              )}
+            </div>
+            <div style={{ paddingBottom: 4 }}>
+              <span className="zl-eyebrow" style={{ marginBottom: 4, display: "block" }}>{isAdmin ? "Admin" : "Productor"} · Zoundlist</span>
+              <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "var(--text)", margin: 0, lineHeight: 1.1 }}>{displayName}</h1>
+            </div>
+            <div style={{ marginLeft: "auto", paddingBottom: 4 }}>
+              <a href="/dashboard/perfil" className="zl-btn zl-btn--ghost zl-btn--sm">Editar perfil →</a>
+            </div>
+          </div>
+        )}
+
+        {/* Regular user greeting */}
+        {!uploaderAccess && (
+          <>
+            <span className="zl-eyebrow">Tu panel</span>
+            <h1 className="zl-h2" style={{ margin: "12px 0 10px" }}>Hola, {displayName} 👋</h1>
+            <p className="zl-muted" style={{ maxWidth: 520, marginBottom: 40 }}>
+              Tu cuenta está activa. Desde aquí gestionas tus descargas y licencias.
+            </p>
+          </>
+        )}
 
         {checkout === "success" && (
-          <div style={{ marginTop: 24, padding: "14px 18px", borderRadius: "var(--r)", background: "var(--brand-dim)", border: "1px solid rgba(149,249,8,0.3)", color: "var(--text)", fontSize: "0.9rem" }}>
+          <div style={{ marginBottom: 28, padding: "14px 18px", borderRadius: "var(--r)", background: "rgba(149,249,8,0.07)", border: "1px solid rgba(149,249,8,0.3)", color: "var(--text)", fontSize: "0.9rem" }}>
             ✓ ¡Pago recibido! Tu suscripción se activará en unos segundos. Si no ves el plan aún, refresca la página.
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 20, marginTop: 40 }}>
-          {/* Upload — live for admins */}
-          {isAdmin ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 20 }}>
+
+          {/* Upload — producers & admins */}
+          {uploaderAccess ? (
             <a href="/dashboard/upload" className="zl-card" style={{ padding: 24, textDecoration: "none", display: "block" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                 <h3 style={{ fontSize: "1.02rem", fontWeight: 700, color: "var(--text)" }}>Subir música →</h3>
                 <span className="zl-pill-new">Activo</span>
               </div>
-              <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>Carga tracks al catálogo curado: audio, metadatos y portada.</p>
+              <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>Carga tracks al catálogo: audio, metadatos y portada.</p>
             </a>
           ) : (
             <div className="zl-card" style={{ padding: 24 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                 <h3 style={{ fontSize: "1.02rem", fontWeight: 700 }}>Subir música</h3>
-                <span className="zl-tag">Solo admin</span>
+                <span className="zl-tag">Solo productores</span>
               </div>
-              <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>La carga de música está reservada al equipo de curación.</p>
+              <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55 }}>La carga de música está reservada a los artistas de Zoundlist.</p>
             </div>
           )}
 
-          {/* Mi plan — real subscription status */}
+          {/* Perfil público — solo productores/admins */}
+          {uploaderAccess && (
+            <div className="zl-card" style={{ padding: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <h3 style={{ fontSize: "1.02rem", fontWeight: 700 }}>Mi perfil público</h3>
+                {profile.artistSlug ? <span className="zl-pill-new">Activo</span> : <span className="zl-tag">Sin configurar</span>}
+              </div>
+              {profile.artistSlug ? (
+                <>
+                  <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55, marginBottom: 14 }}>
+                    Tu página pública en Zoundlist.
+                  </p>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <a href={`/artistas/${profile.artistSlug}`} target="_blank" rel="noopener noreferrer" className="zl-btn zl-btn--ghost zl-btn--sm">Ver página →</a>
+                    <a href="/dashboard/perfil" className="zl-btn zl-btn--ghost zl-btn--sm">Editar</a>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: "0.86rem", color: "var(--text-2)", lineHeight: 1.55, marginBottom: 14 }}>
+                    Configura tu perfil para que los usuarios te encuentren.
+                  </p>
+                  <a href="/dashboard/perfil" className="zl-btn zl-btn--primary zl-btn--sm">Configurar perfil →</a>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Mi plan */}
           <div className="zl-card" style={{ padding: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
               <h3 style={{ fontSize: "1.02rem", fontWeight: 700 }}>Mi plan</h3>
@@ -103,7 +178,7 @@ export default async function DashboardPage({
             )}
           </div>
 
-          {/* Mis descargas — real history + license certificates */}
+          {/* Mis descargas */}
           <div className="zl-card" style={{ padding: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
               <h3 style={{ fontSize: "1.02rem", fontWeight: 700 }}>Mis descargas</h3>
@@ -127,6 +202,7 @@ export default async function DashboardPage({
               </ul>
             )}
           </div>
+
         </div>
       </section>
     </main>
