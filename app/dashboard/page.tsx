@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getMyProfile, isSubscriptionActive, canUpload } from "@/services/profile";
 import { getMyDownloads } from "@/services/downloads";
-import { getMyTracksWithStats } from "@/services/producer";
+import { getMyAlbums } from "@/services/albums";
 import { Brand } from "@/components/brand";
 import { SignOutButton } from "./sign-out-button";
 import { ManageBillingButton } from "./manage-billing-button";
@@ -25,9 +25,9 @@ export default async function DashboardPage({
   if (!profile) redirect("/?auth=required");
 
   const { checkout } = await searchParams;
-  const [downloads, myTracks] = await Promise.all([
+  const [downloads, myAlbums] = await Promise.all([
     getMyDownloads(),
-    canUpload(profile) ? getMyTracksWithStats() : Promise.resolve([]),
+    canUpload(profile) ? getMyAlbums() : Promise.resolve([]),
   ]);
   const isAdmin = profile.role === "admin";
   const isProducer = profile.role === "producer";
@@ -210,53 +210,48 @@ export default async function DashboardPage({
 
         </div>
 
-        {/* Mis tracks — solo productores/admins */}
+        {/* Mis álbumes — solo productores/admins */}
         {uploaderAccess && (
           <div style={{ marginTop: 40 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <h2 style={{ fontSize: "1.15rem", fontWeight: 700 }}>
-                Mis tracks <span style={{ fontSize: "0.82rem", fontWeight: 400, color: "var(--text-3)", marginLeft: 8 }}>{myTracks.length} publicados</span>
+                Mis álbumes <span style={{ fontSize: "0.82rem", fontWeight: 400, color: "var(--text-3)", marginLeft: 8 }}>{myAlbums.length} {myAlbums.length === 1 ? "álbum" : "álbumes"}</span>
               </h2>
-              <a href="/dashboard/upload" className="zl-btn zl-btn--primary zl-btn--sm">+ Subir track</a>
+              <a href="/dashboard/albums/new" className="zl-btn zl-btn--primary zl-btn--sm">+ Añadir álbum</a>
             </div>
 
-            {myTracks.length === 0 ? (
-              <div className="zl-card" style={{ padding: "32px 24px", textAlign: "center" }}>
-                <p className="zl-muted" style={{ marginBottom: 16 }}>Aún no has subido ningún track. ¡Empieza ahora!</p>
-                <a href="/dashboard/upload" className="zl-btn zl-btn--primary zl-btn--sm">Subir primer track</a>
+            {myAlbums.length === 0 ? (
+              <div className="zl-card" style={{ padding: "40px 24px", textAlign: "center" }}>
+                <p style={{ fontSize: "2rem", marginBottom: 12 }}>🎵</p>
+                <p className="zl-muted" style={{ marginBottom: 20 }}>Aún no tienes álbumes. Crea uno y empieza a añadir tracks.</p>
+                <a href="/dashboard/albums/new" className="zl-btn zl-btn--primary">+ Crear primer álbum</a>
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {myTracks.map((track) => (
-                  <div key={track.id} className="zl-card" style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 16 }}>
-                    {/* Cover */}
-                    <div style={{
-                      width: 48, height: 48, borderRadius: 10, flexShrink: 0, overflow: "hidden",
-                      background: track.coverImage ? `url(${track.coverImage}) center/cover no-repeat` : COVERS[track.cover],
-                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem",
-                    }}>
-                      {!track.coverImage && track.glyph}
-                    </div>
-
-                    {/* Info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontWeight: 600, fontSize: "0.92rem", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{track.title}</p>
-                      <p style={{ fontSize: "0.75rem", color: "var(--text-3)", margin: "3px 0 0" }}>
-                        {track.genre} · {track.mood} {track.bpm ? `· ${track.bpm} BPM` : ""} {track.duration ? `· ${track.duration}` : ""}
-                      </p>
-                    </div>
-
-                    {/* Stats */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 18, flexShrink: 0 }}>
-                      <div style={{ textAlign: "center" }}>
-                        <p style={{ fontSize: "1rem", fontWeight: 700, margin: 0, color: track.downloadCount > 0 ? "var(--brand)" : "var(--text-3)" }}>{track.downloadCount}</p>
-                        <p style={{ fontSize: "0.68rem", color: "var(--text-3)", margin: 0 }}>descargas</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+                {myAlbums.map((album) => (
+                  <a key={album.id} href={`/dashboard/albums/${album.id}`} style={{ textDecoration: "none" }}>
+                    <div className="zl-card" style={{ padding: 18, display: "flex", gap: 14, alignItems: "center", cursor: "pointer" }}>
+                      {/* Cover */}
+                      <div style={{
+                        width: 64, height: 64, borderRadius: 12, flexShrink: 0, overflow: "hidden",
+                        background: album.coverImage ? `url(${album.coverImage}) center/cover no-repeat` : COVERS[album.cover],
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.6rem",
+                      }}>
+                        {!album.coverImage && album.glyph}
                       </div>
-                      <span className={track.published ? "zl-pill-new" : "zl-tag"} style={{ fontSize: "0.7rem" }}>
-                        {track.published ? "Publicado" : "Borrador"}
-                      </span>
+
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontWeight: 700, fontSize: "0.95rem", margin: "0 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{album.title}</p>
+                        <p style={{ fontSize: "0.76rem", color: "var(--text-3)", margin: 0 }}>
+                          {album.trackCount} {album.trackCount === 1 ? "track" : "tracks"}
+                          {album.downloadCount > 0 && <span style={{ color: "var(--brand)", marginLeft: 8 }}>· {album.downloadCount} descargas</span>}
+                        </p>
+                      </div>
+
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2" style={{ flexShrink: 0 }}><path d="M9 18l6-6-6-6"/></svg>
                     </div>
-                  </div>
+                  </a>
                 ))}
               </div>
             )}

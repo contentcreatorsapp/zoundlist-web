@@ -19,7 +19,7 @@ function slugify(s: string): string {
 const labelStyle: React.CSSProperties = { display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-2)", marginBottom: 6 };
 const fieldStyle: React.CSSProperties = { marginBottom: 18 };
 
-export function UploadForm({ genres, moods }: { genres: Genre[]; moods: Mood[] }) {
+export function UploadForm({ genres, moods, albumId }: { genres: Genre[]; moods: Mood[]; albumId?: string }) {
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [genre, setGenre] = useState(genres[0]?.slug ?? "cinematic");
@@ -116,6 +116,7 @@ export function UploadForm({ genres, moods }: { genres: Genre[]; moods: Mood[] }
       featured,
       published: true,
       uploader_id: user?.id ?? null,
+      album_id: albumId ?? null,
       sort_order: Math.floor(Date.now() / 1000),
     });
 
@@ -141,7 +142,10 @@ export function UploadForm({ genres, moods }: { genres: Genre[]; moods: Mood[] }
         </p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
           <button className="zl-btn zl-btn--primary" onClick={reset}>Subir otro</button>
-          <a className="zl-btn zl-btn--ghost" href="/">Ver la home</a>
+          {albumId
+            ? <a className="zl-btn zl-btn--ghost" href={`/dashboard/albums/${albumId}`}>← Volver al álbum</a>
+            : <a className="zl-btn zl-btn--ghost" href="/">Ver la home</a>
+          }
         </div>
       </div>
     );
