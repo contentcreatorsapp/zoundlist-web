@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getPublicArtist } from "@/services/profile";
-import { getArtistPublicTracks } from "@/services/producer";
+import { getArtistAlbums } from "@/services/albums";
 import { COVERS } from "@/lib/catalog/covers";
 import { Brand } from "@/components/brand";
 import type { Metadata } from "next";
@@ -23,7 +23,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
   const { slug } = await params;
   const artist = await getPublicArtist(slug);
   if (!artist) notFound();
-  const tracks = await getArtistPublicTracks(artist.id);
+  const albums = await getArtistAlbums(artist.id);
 
   const name = artist.artistName ?? artist.fullName ?? "Artista";
 
@@ -115,48 +115,39 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           )}
         </div>
 
-        {/* Tracks */}
+        {/* Álbumes */}
         <div style={{ marginTop: 56 }}>
           <h2 style={{ fontSize: "1.3rem", fontWeight: 700, marginBottom: 20 }}>
-            Música <span style={{ fontSize: "0.82rem", fontWeight: 400, color: "var(--text-3)", marginLeft: 8 }}>{tracks.length} tracks</span>
+            Música <span style={{ fontSize: "0.82rem", fontWeight: 400, color: "var(--text-3)", marginLeft: 8 }}>{albums.length} {albums.length === 1 ? "álbum" : "álbumes"}</span>
           </h2>
 
-          {tracks.length === 0 ? (
+          {albums.length === 0 ? (
             <div className="zl-card" style={{ padding: "40px 32px", textAlign: "center" }}>
               <p className="zl-muted">Próximamente música de este artista.</p>
               <a href="/" className="zl-btn zl-btn--primary" style={{ marginTop: 20 }}>Explorar catálogo</a>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {tracks.map((track, i) => (
-                <div key={track.id} className="zl-card" style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 16 }}>
-                  {/* Number */}
-                  <span style={{ width: 24, textAlign: "center", fontSize: "0.8rem", color: "var(--text-3)", flexShrink: 0 }}>{i + 1}</span>
-
-                  {/* Cover */}
-                  <div style={{
-                    width: 52, height: 52, borderRadius: 10, flexShrink: 0, overflow: "hidden",
-                    background: track.coverImage ? `url(${track.coverImage}) center/cover no-repeat` : COVERS[track.cover],
-                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.3rem",
-                  }}>
-                    {!track.coverImage && track.glyph}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+              {albums.map((album) => (
+                <a key={album.id} href={`/albumes/${album.id}`} style={{ textDecoration: "none" }}>
+                  <div className="zl-card" style={{ padding: 0, overflow: "hidden", cursor: "pointer" }}>
+                    {/* Cover */}
+                    <div style={{
+                      width: "100%", aspectRatio: "1 / 1", overflow: "hidden",
+                      background: album.coverImage ? `url(${album.coverImage}) center/cover no-repeat` : COVERS[album.cover],
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: "3rem",
+                    }}>
+                      {!album.coverImage && album.glyph}
+                    </div>
+                    <div style={{ padding: "14px 16px" }}>
+                      <p style={{ fontWeight: 700, fontSize: "0.95rem", margin: "0 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{album.title}</p>
+                      <p style={{ fontSize: "0.76rem", color: "var(--text-3)", margin: 0 }}>
+                        {album.trackCount} {album.trackCount === 1 ? "track" : "tracks"}
+                        {album.mood && ` · ${album.mood}`}
+                      </p>
+                    </div>
                   </div>
-
-                  {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 600, fontSize: "0.95rem", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{track.title}</p>
-                    <p style={{ fontSize: "0.76rem", color: "var(--text-3)", margin: "3px 0 0" }}>
-                      {track.mood} {track.bpm ? `· ${track.bpm} BPM` : ""}
-                    </p>
-                  </div>
-
-                  {/* Meta */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                    {track.isNew && <span className="zl-pill-new" style={{ fontSize: "0.68rem" }}>Nuevo</span>}
-                    <span style={{ fontSize: "0.82rem", color: "var(--text-3)" }}>{track.duration}</span>
-                    <a href="/" className="zl-btn zl-btn--ghost zl-btn--sm">Escuchar →</a>
-                  </div>
-                </div>
+                </a>
               ))}
             </div>
           )}

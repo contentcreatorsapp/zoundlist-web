@@ -144,6 +144,47 @@ export async function getAlbumWithTracks(albumId: string): Promise<{ album: Albu
   return { album: mapAlbum(albumRow, tracks.length, Object.values(dlCounts).reduce((a, b) => a + b, 0)), tracks };
 }
 
+/** Public album with its tracks — used on /albumes/[slug]. No auth required. */
+export async function getPublicAlbumWithTracks(albumId: string): Promise<{ album: Album; tracks: AlbumTrack[]; artistSlug: string | null } | null> {
+  const supabase = await createClient();
+
+  const { data: albumRow } = await supabase
+    .from("albums")
+    .select("*")
+    .eq("id", albumId)
+    .eq("published", true)
+    .maybeSingle();
+
+  if (!albumRow) return null;
+
+  const { data: trackRows } = await supabase
+    .from("tracks")
+    .select("*")
+    .eq("album_id", albumId)
+    .eq("published", true)
+    .order("sort_order", { ascending: true });
+
+  // Get artist slug for the back link
+  let artistSlug: string | null = null;
+  if (albumRow.uploader_id) {
+    const { data: profileRow } = await supabase
+      .from("profiles")
+      .select("artist_slug")
+      .eq("id", albumRow.uploader_id)
+      .maybeSingle();
+    artistSlug = profileRow?.artist_slug ?? null;
+  }
+
+  const tracks: AlbumTrack[] = (trackRows ?? []).map((r: any) => ({ /* eslint-disable-line @typescript-eslint/no-explicit-any */
+    id: r.id, title: r.title, artist: r.artist, genre: r.genre_slug, mood: r.mood,
+    cover: r.cover as CoverVariant, coverImage: r.cover_image ?? null,
+    glyph: r.glyph ?? "🎵", bpm: r.bpm ?? 0, duration: r.duration ?? "",
+    audioUrl: r.audio_path ?? null, published: !!r.published, downloadCount: 0,
+  }));
+
+  return { album: mapAlbum(albumRow, tracks.length, 0), tracks, artistSlug };
+}
+
 /** Public albums for an artist — used on /artistas/[slug]. */
 export async function getArtistAlbums(uploaderId: string): Promise<Album[]> {
   const supabase = await createClient();
