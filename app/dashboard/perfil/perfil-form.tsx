@@ -164,8 +164,8 @@ export function PerfilForm({ profile }: { profile: Profile }) {
             </div>
           </div>
           <div style={field}>
-            <label style={label}>Spotify</label>
-            <input className="zl-input" type="text" placeholder="URL de artista en Spotify" value={spotify} onChange={e => setSpotify(e.target.value)} />
+            <label style={label}>YouTube</label>
+            <input className="zl-input" type="text" placeholder="URL de tu canal en YouTube" value={spotify} onChange={e => setSpotify(e.target.value)} />
           </div>
         </div>
 
