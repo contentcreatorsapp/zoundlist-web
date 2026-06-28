@@ -23,14 +23,37 @@
 - Branch: main
 - CI: Vercel auto-deploys on push to main
 
-## Environment variables (set in Vercel)
-- NEXT_PUBLIC_APP_URL=https://zoundlist.com
-- NEXT_PUBLIC_APP_NAME=Zoundlist
-- NEXT_PUBLIC_SUPABASE_URL= (add when integrating)
-- NEXT_PUBLIC_SUPABASE_ANON_KEY= (add when integrating)
-- STRIPE_SECRET_KEY= (add when integrating)
-- STRIPE_WEBHOOK_SECRET= (add when integrating)
-- RESEND_API_KEY= (add when integrating)
+## Environment variables (set in Vercel + .env.local)
+
+### App
+- `NEXT_PUBLIC_APP_URL=https://zoundlist.com`
+- `NEXT_PUBLIC_APP_NAME=Zoundlist`
+
+### SEO
+- `GOOGLE_SITE_VERIFICATION=` — meta tag token from Google Search Console
+
+### Supabase
+- `NEXT_PUBLIC_SUPABASE_URL=` — Project URL (public)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY=` — anon/public key
+- `SUPABASE_SERVICE_ROLE_KEY=` — service_role secret (server-only, bypasses RLS)
+
+### Stripe
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=`
+- `STRIPE_SECRET_KEY=`
+- `STRIPE_WEBHOOK_SECRET=`
+- `STRIPE_PRICE_CREATOR=`, `STRIPE_PRICE_PRO=`, `STRIPE_PRICE_CHURCH=`
+
+### AI Publishing Assistant
+- `ANTHROPIC_API_KEY=` — **required** to use the AI Publishing Assistant.
+  Get it at console.anthropic.com → API Keys.
+  Uses `claude-haiku-4-5-20251001` (fast + cost-efficient for metadata generation).
+- `AI_PROVIDER=anthropic` — active provider. Options:
+  - `anthropic` (default, fully implemented)
+  - `openai` — stub only, not yet implemented
+  - `gemini` — stub only, not yet implemented
+
+### Resend
+- `RESEND_API_KEY=` — add when integrating transactional email
 
 ## Architecture (service-layer pattern for future mobile)
 ```
@@ -75,9 +98,44 @@ for the wordmark lockup in any new header/footer.
 - Add assetlinks.json
 - Hardcode zoundlist.com URLs — use NEXT_PUBLIC_APP_URL env var
 
+## Architecture — AI Publishing Assistant (implemented June 2026)
+```
+lib/ai/
+  types.ts              → TrackMetadataInput, TrackMetadataSuggestion, AIProvider interface
+  factory.ts            → getAIProvider() — reads AI_PROVIDER env var
+  providers/
+    anthropic.ts        → Real: Claude Haiku via Anthropic Messages API (tool_use)
+    openai.ts           → Stub — throws if called
+    gemini.ts           → Stub — throws if called
+
+app/api/ai/
+  generate-track-metadata/route.ts
+    → POST { trackId }
+    → Verifies auth + uploader_id ownership
+    → Calls AI provider
+    → Upserts to ai_track_suggestions table
+    → Updates tracks.ai_status = 'ai_generated'
+    → Returns { suggestion, processingMs }
+
+components/ai/
+  PublishingAssistant.tsx
+    → Rendered inside AlbumTracksClient (dashboard album page)
+    → Only visible when album has unpublished tracks
+    → Phases: idle → generating → reviewing → applying → done
+    → Per-track review: all metadata fields editable inline before applying
+
+supabase/migrations/
+  0012_ai_suggestions.sql
+    → ai_track_suggestions table (1 row per track, upserted on each run)
+    → tracks.ai_status column: draft | ai_generated | reviewed | published
+```
+
 ## Current state (June 2026)
 - Landing page: complete (translated from HTML prototype)
 - Domain: connected to Vercel (zoundlist.com)
-- Auth: not yet integrated
-- Payments: not yet integrated
-- Catalog from DB: not yet integrated (using mock data)
+- Auth: ✅ integrated (Supabase Auth)
+- Payments: Stripe integrated (subscriptions)
+- Catalog from DB: ✅ integrated
+- Global audio player: ✅ implemented (PlayerProvider, PlayerBar, queue, shuffle/repeat)
+- Album pages (public + dashboard): ✅ connected to player
+- AI Publishing Assistant: ✅ implemented — pending: run migration 0012 in Supabase + add ANTHROPIC_API_KEY to Vercel
