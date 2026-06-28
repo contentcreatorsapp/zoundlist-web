@@ -9,6 +9,7 @@ interface CoverAsset {
   genre_slug: string;
   public_url: string;
   storage_path: string;
+  in_use: boolean;
 }
 
 interface Props {
@@ -19,30 +20,28 @@ interface Props {
 
 export function CoverPicker({ albumId, genreSlug, coverImage }: Props) {
   const router = useRouter();
-  const [covers, setCovers]     = useState<CoverAsset[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [pending, setPending]   = useState<string | null>(null);
-  const [saved, setSaved]       = useState<string | null>(coverImage);
-  const [saving, setSaving]     = useState(false);
-  const [saved_ok, setSavedOk]  = useState(false);
+  const [covers, setCovers]   = useState<CoverAsset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState<string | null>(null);
+  const [saved, setSaved]     = useState<string | null>(coverImage);
+  const [saving, setSaving]   = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/covers?genre=${genreSlug}`)
+    fetch(`/api/covers?genre=${genreSlug}&albumId=${albumId}`)
       .then(r => r.json())
       .then(d => { setCovers(d.covers ?? []); setLoading(false); });
-  }, [genreSlug]);
+  }, [genreSlug, albumId]);
 
   const save = async () => {
     if (!pending || pending === saved) return;
     setSaving(true);
     setSavedOk(false);
     const supabase = createClient();
-
     await Promise.all([
       supabase.from("albums").update({ cover_image: pending }).eq("id", albumId),
       supabase.from("tracks").update({ cover_image: pending }).eq("album_id", albumId),
     ]);
-
     setSaved(pending);
     setSaving(false);
     setSavedOk(true);
@@ -65,12 +64,9 @@ export function CoverPicker({ albumId, genreSlug, coverImage }: Props) {
       <div style={{
         width: 120, height: 120, borderRadius: 16, flexShrink: 0, overflow: "hidden",
         background: current ? `url(${current}) center/cover no-repeat` : "var(--surface)",
-        border: pending && pending !== saved
-          ? "2px solid var(--brand)"
-          : "2px solid var(--border)",
+        border: pending && pending !== saved ? "2px solid var(--brand)" : "2px solid var(--border)",
       }} />
 
-      {/* Cover grid */}
       {covers.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <p style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text-3)",
@@ -79,24 +75,36 @@ export function CoverPicker({ albumId, genreSlug, coverImage }: Props) {
           </p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {covers.map(c => (
-              <button
-                key={c.id}
-                onClick={() => setPending(c.public_url)}
-                style={{
-                  width: 64, height: 64, borderRadius: 10, padding: 0, border: "none",
-                  cursor: "pointer", overflow: "hidden", flexShrink: 0,
-                  background: `url(${c.public_url}) center/cover no-repeat`,
-                  outline: (pending ?? saved) === c.public_url
-                    ? "2px solid var(--brand)" : "2px solid transparent",
-                  outlineOffset: 2,
-                  transition: "outline 0.1s",
-                  opacity: saving ? 0.6 : 1,
-                }}
-              />
+              <div key={c.id} style={{ position: "relative", flexShrink: 0 }}>
+                <button
+                  onClick={() => setPending(c.public_url)}
+                  title={c.in_use ? "En uso en otro álbum" : undefined}
+                  style={{
+                    width: 64, height: 64, borderRadius: 10, padding: 0, border: "none",
+                    cursor: "pointer", overflow: "hidden", display: "block",
+                    background: `url(${c.public_url}) center/cover no-repeat`,
+                    outline: (pending ?? saved) === c.public_url
+                      ? "2px solid var(--brand)" : "2px solid transparent",
+                    outlineOffset: 2,
+                    opacity: saving ? 0.6 : 1,
+                    transition: "outline 0.1s",
+                  }}
+                />
+                {c.in_use && (pending ?? saved) !== c.public_url && (
+                  <span style={{
+                    position: "absolute", bottom: 4, left: 0, right: 0,
+                    textAlign: "center", fontSize: "0.5rem", fontWeight: 800,
+                    color: "#fff", background: "rgba(0,0,0,0.65)",
+                    padding: "2px 0", letterSpacing: "0.04em",
+                    textTransform: "uppercase", pointerEvents: "none",
+                  }}>
+                    en uso
+                  </span>
+                )}
+              </div>
             ))}
           </div>
 
-          {/* Save button */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button
               className="zl-btn zl-btn--primary zl-btn--sm"
@@ -106,7 +114,7 @@ export function CoverPicker({ albumId, genreSlug, coverImage }: Props) {
             >
               {saving ? "Guardando…" : "Guardar portada"}
             </button>
-            {saved_ok && (
+            {savedOk && (
               <span style={{ fontSize: "0.8rem", color: "var(--brand)" }}>
                 ✓ Aplicada al álbum y todos los tracks
               </span>
