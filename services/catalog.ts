@@ -30,6 +30,21 @@ function mapTrack(r: any): Track {
     staffHero: !!r.staff_hero,
     isNew: !!r.is_new,
     staffNote: r.staff_note ?? null,
+    subgenre: r.subgenre ?? null,
+    musicalKey: r.musical_key ?? null,
+    energy: r.energy ?? null,
+    instruments: r.instruments ?? [],
+    tags: r.tags ?? [],
+    recommendedUses: r.recommended_uses ?? [],
+    description: r.description ?? null,
+    durationSecs: r.duration_secs ?? null,
+    fileFormat: r.file_format ?? null,
+    bitrate: r.bitrate ?? null,
+    sampleRate: r.sample_rate ?? null,
+    channels: r.channels ?? null,
+    fileSize: r.file_size ?? null,
+    storagePath: r.storage_path ?? null,
+    processingStatus: r.processing_status ?? null,
   };
 }
 function mapGenre(r: any): Genre {

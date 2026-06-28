@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { CoverVariant } from "@/types/catalog";
+import type { CoverVariant, ProcessingStatus } from "@/types/catalog";
 
 export interface ProducerTrack {
   id: string;
@@ -18,6 +18,26 @@ export interface ProducerTrack {
   featured: boolean;
   downloadCount: number;
   createdAt: string | null;
+  albumId: string | null;
+
+  // Extended metadata
+  subgenre: string | null;
+  musicalKey: string | null;
+  energy: number | null;
+  instruments: string[];
+  tags: string[];
+  recommendedUses: string[];
+  description: string | null;
+
+  // Technical
+  durationSecs: number | null;
+  fileFormat: string | null;
+  bitrate: number | null;
+  sampleRate: number | null;
+  channels: number | null;
+  fileSize: number | null;
+  storagePath: string | null;
+  processingStatus: ProcessingStatus | null;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -39,6 +59,24 @@ function mapRow(r: any, downloadCounts: Record<string, number>): ProducerTrack {
     featured: !!r.featured,
     downloadCount: downloadCounts[r.id] ?? 0,
     createdAt: r.created_at ?? null,
+    albumId: r.album_id ?? null,
+
+    subgenre: r.subgenre ?? null,
+    musicalKey: r.musical_key ?? null,
+    energy: r.energy ?? null,
+    instruments: r.instruments ?? [],
+    tags: r.tags ?? [],
+    recommendedUses: r.recommended_uses ?? [],
+    description: r.description ?? null,
+
+    durationSecs: r.duration_secs ?? null,
+    fileFormat: r.file_format ?? null,
+    bitrate: r.bitrate ?? null,
+    sampleRate: r.sample_rate ?? null,
+    channels: r.channels ?? null,
+    fileSize: r.file_size ?? null,
+    storagePath: r.storage_path ?? null,
+    processingStatus: r.processing_status ?? null,
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -69,6 +107,23 @@ export async function getMyTracksWithStats(): Promise<ProducerTrack[]> {
   });
 
   return tracks.map((r: any) => mapRow(r, counts)); /* eslint-disable-line @typescript-eslint/no-explicit-any */
+}
+
+/** Single track by ID — only returns if owned by current user. */
+export async function getMyTrackById(trackId: string): Promise<ProducerTrack | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("tracks")
+    .select("*")
+    .eq("id", trackId)
+    .eq("uploader_id", user.id)
+    .maybeSingle();
+
+  if (!data) return null;
+  return mapRow(data, {}); /* eslint-disable-line @typescript-eslint/no-explicit-any */
 }
 
 /** Public: returns published tracks for an artist by their profile id. */

@@ -3,6 +3,8 @@
 export type CoverVariant =
   | "violet" | "lime" | "orange" | "magenta" | "teal" | "gold" | "ice" | "ember";
 
+export type ProcessingStatus = "pending" | "analyzing" | "ready" | "error";
+
 export interface Track {
   id: string;
   title: string;
@@ -13,7 +15,7 @@ export interface Track {
   coverImage: string | null;
   glyph: string;
   bpm: number;
-  duration: string;
+  duration: string;     // formatted "3:45"
   audioUrl: string | null;
   featured: boolean;
   trending: boolean;
@@ -21,6 +23,27 @@ export interface Track {
   staffHero: boolean;
   isNew: boolean;
   staffNote: string | null;
+
+  // Extended metadata (Phase 1)
+  subgenre: string | null;
+  musicalKey: string | null;
+  energy: number | null;          // 1–10
+  instruments: string[];
+  tags: string[];
+  recommendedUses: string[];
+  description: string | null;
+
+  // Technical audio info (Phase 2 — populated on upload)
+  durationSecs: number | null;
+  fileFormat: string | null;
+  bitrate: number | null;
+  sampleRate: number | null;
+  channels: number | null;
+  fileSize: number | null;
+  storagePath: string | null;
+
+  // Pipeline
+  processingStatus: ProcessingStatus | null;
 }
 
 export interface Genre {

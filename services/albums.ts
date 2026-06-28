@@ -99,15 +99,24 @@ export async function getMyAlbums(): Promise<Album[]> {
   return albums.map((a: any) => mapAlbum(a, tracksByAlbum[a.id] ?? 0, downloadsByAlbum[a.id] ?? 0)); /* eslint-disable-line @typescript-eslint/no-explicit-any */
 }
 
-/** Single album with its tracks — for the album detail page. */
+/**
+ * Dashboard: fetch a single album the current user owns (or admin access any).
+ * Returns null if not found or the requester doesn't own it.
+ */
 export async function getAlbumWithTracks(albumId: string): Promise<{ album: Album; tracks: AlbumTrack[] } | null> {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
-  const { data: albumRow } = await supabase
-    .from("albums")
-    .select("*")
-    .eq("id", albumId)
-    .maybeSingle();
+  // Admins can access any album; producers only their own.
+  const { data: profileRow } = await supabase
+    .from("profiles").select("role").eq("id", user.id).maybeSingle();
+  const isAdmin = profileRow?.role === "admin";
+
+  const albumQuery = supabase.from("albums").select("*").eq("id", albumId);
+  if (!isAdmin) albumQuery.eq("uploader_id", user.id);
+
+  const { data: albumRow } = await albumQuery.maybeSingle();
 
   if (!albumRow) return null;
 

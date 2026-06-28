@@ -8,6 +8,10 @@ function t(p: Partial<Track> & Pick<Track, "id" | "title" | "artist" | "genre" |
   return {
     audioUrl: null, coverImage: null,
     featured: false, trending: false, staffPick: false, staffHero: false, isNew: false, staffNote: null,
+    subgenre: null, musicalKey: null, energy: null,
+    instruments: [], tags: [], recommendedUses: [], description: null,
+    durationSecs: null, fileFormat: null, bitrate: null, sampleRate: null,
+    channels: null, fileSize: null, storagePath: null, processingStatus: "ready",
     ...p,
   };
 }
