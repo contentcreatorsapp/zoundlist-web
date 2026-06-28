@@ -167,12 +167,16 @@ export function PlayerBar() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!p.track) return;
-    const a = document.createElement("a");
-    a.href = p.track.audioUrl;
+    const res  = await fetch(p.track.audioUrl);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
     a.download = `${p.track.title}.${audioFormat(p.track.audioUrl).toLowerCase()}`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   const displayTime = isSeeking ? seekValue : p.currentTime;
