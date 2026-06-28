@@ -23,10 +23,16 @@ async function buildImagePrompt(
       model:      "claude-haiku-4-5-20251001",
       max_tokens: 300,
       system:
-        "You are an expert at writing DALL-E 3 prompts for professional music album covers. " +
-        "Write a single detailed prompt (no intro text, no quotes) that will produce a " +
-        "stunning, professional square album cover. Use dark, moody aesthetics with the brand " +
-        "color neon green (#95F908) as an accent. Abstract or semi-abstract art preferred. " +
+        "You are an expert at writing image generation prompts for professional music album covers. " +
+        "Write a single detailed prompt (no intro text, no quotes) that will produce a stunning, " +
+        "professional square album cover. Adapt the visual style to match the album's genre and mood: " +
+        "corporate/business → clean, minimal, architectural, professional; " +
+        "cinematic/epic → dramatic landscapes, light beams, grand scale; " +
+        "electronic/dance → geometric, neon, abstract; " +
+        "ambient → soft gradients, nature, ethereal; " +
+        "jazz/acoustic → warm tones, texture, organic. " +
+        "Always include neon green (#95F908) as a subtle accent element. " +
+        "Dark background preferred but not mandatory. Abstract or semi-abstract art preferred. " +
         "No text or typography in the image. No human faces.",
       messages: [{
         role: "user",
