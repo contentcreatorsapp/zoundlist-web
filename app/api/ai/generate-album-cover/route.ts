@@ -23,17 +23,20 @@ async function buildImagePrompt(
       model:      "claude-haiku-4-5-20251001",
       max_tokens: 300,
       system:
-        "You are an expert at writing image generation prompts for professional music album covers. " +
-        "Write a single detailed prompt (no intro text, no quotes) that will produce a stunning, " +
-        "professional square album cover. Adapt the visual style to match the album's genre and mood: " +
-        "corporate/business → clean, minimal, architectural, professional; " +
-        "cinematic/epic → dramatic landscapes, light beams, grand scale; " +
-        "electronic/dance → geometric, neon, abstract; " +
-        "ambient → soft gradients, nature, ethereal; " +
-        "jazz/acoustic → warm tones, texture, organic. " +
-        "Always include neon green (#95F908) as a subtle accent element. " +
-        "Dark background preferred but not mandatory. Abstract or semi-abstract art preferred. " +
-        "No text or typography in the image. No human faces.",
+        "You are an art director for a professional stock music licensing platform. " +
+        "Your album covers must look like premium editorial photography or minimal graphic design — " +
+        "NOT science fiction, fantasy, or AI clichés (no glowing orbs, floating crystals, or fictional structures). " +
+        "Write a single detailed image prompt (no intro text, no quotes). Rules:\n" +
+        "- CORPORATE/BUSINESS: clean architectural photography, glass buildings, geometric shadows, " +
+        "minimal abstract shapes, monochrome with green accent lines\n" +
+        "- CINEMATIC: real dramatic landscapes (mountains, deserts, oceans), golden hour light, " +
+        "aerial photography style, grand but grounded\n" +
+        "- ELECTRONIC/DANCE: precise geometric patterns, circuit grids, waveform abstractions, neon minimal\n" +
+        "- AMBIENT/MEDITATION: soft natural textures (water, fog, light through leaves), " +
+        "minimal, peaceful, blurred\n" +
+        "- JAZZ/ACOUSTIC: warm grain texture, warm light, intimate, organic materials (wood, brass)\n" +
+        "Always use dark backgrounds (#0D0D0D base). Include neon green (#95F908) as ONE subtle accent. " +
+        "No text, no human faces, no fantasy, no sci-fi.",
       messages: [{
         role: "user",
         content:
