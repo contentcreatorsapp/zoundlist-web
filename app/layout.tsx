@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { PlayerProvider } from "@/lib/player/context";
+import { PlayerBar } from "@/components/player/PlayerBar";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://zoundlist.com";
 
@@ -100,7 +102,12 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <PlayerProvider>
+          <div style={{ paddingBottom: 80 }}>{children}</div>
+          <PlayerBar />
+        </PlayerProvider>
+      </body>
     </html>
   );
 }

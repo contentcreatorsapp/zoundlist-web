@@ -5,7 +5,8 @@ import type { User } from "@supabase/supabase-js";
 import type { Catalog, CoverVariant } from "@/types/catalog";
 import { COVERS } from "@/lib/catalog/covers";
 import { Brand } from "@/components/brand";
-import { usePlayer } from "@/lib/use-player";
+import { usePlayer } from "@/lib/player/context";
+import type { PlayerTrack } from "@/lib/player/types";
 import { signUpWithPassword, signInWithPassword, resetPassword, signInWithProvider } from "@/services/auth";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
@@ -169,11 +170,26 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
   const [activeFilter, setActiveFilter] = useState("all");
   const [heroIdx, setHeroIdx] = useState(0);
 
-  // Real audio player (falls back to simulated progress for tracks without audio)
+  // Global audio player
   const player = usePlayer();
-  const playingTrack = tracks.find((t) => t.id === player.playingId);
+
+  // Map a catalog Track → PlayerTrack
+  const toPlayerTrack = (t: typeof tracks[0]): PlayerTrack =>
+    ({ id: t.id, title: t.title, artist: t.artist, audioUrl: t.audioUrl,
+       cover: t.cover, coverImage: t.coverImage ?? null, duration: t.duration });
+  const allPlayerTracks = tracks.map(toPlayerTrack);
+
+  // Compatibility shims matching the old usePlayer API shape
+  const playingId = player.track?.id ?? null;
+  const progress  = player.duration > 0 ? player.currentTime / player.duration : 0;
+  const toggle = (t: typeof tracks[0]) => {
+    if (playingId === t.id) { player.togglePlay(); return; }
+    player.playTrack(toPlayerTrack(t), allPlayerTracks);
+  };
+
+  const playingTrack = tracks.find((t) => t.id === playingId);
   const heroTrack = playingTrack ?? heroQueue[heroIdx] ?? tracks[0];
-  const heroOn = !!heroTrack && player.playingId === heroTrack.id;
+  const heroOn = !!heroTrack && playingId === heroTrack.id;
   const heroBars = bars(7, 56);
 
   // Nav scroll state
@@ -199,7 +215,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
-      if (e.code === "Space" && tag !== "INPUT" && tag !== "TEXTAREA") { e.preventDefault(); if (heroTrack) player.toggle(heroTrack); }
+      if (e.code === "Space" && tag !== "INPUT" && tag !== "TEXTAREA") { e.preventDefault(); if (heroTrack) toggle(heroTrack); }
       if (e.key === "Escape") setModalOpen(false);
     };
     document.addEventListener("keydown", handler);
@@ -223,8 +239,8 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
     else if (flag === "error") { setAuthError("El enlace expiró o no es válido. Pide uno nuevo."); setModalOpen(true); }
   }, []);
 
-  const selectQueue = (i: number) => { setHeroIdx(i); if (heroQueue[i]) player.toggle(heroQueue[i]); };
-  const playedBars = Math.floor((heroOn ? player.progress : 0) * heroBars.length);
+  const selectQueue = (i: number) => { setHeroIdx(i); if (heroQueue[i]) toggle(heroQueue[i]); };
+  const playedBars = Math.floor((heroOn ? progress : 0) * heroBars.length);
   const heroDur = heroTrack?.duration ?? "0:00";
   const timeDisplay = heroOn
     ? `${fmt(player.currentTime)} / ${player.duration ? fmt(player.duration) : heroDur}`
@@ -402,7 +418,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
                 </div>
               </div>
 
-              <div className="zl-wave" onClick={() => player.toggle(heroTrack)} role="button" aria-label={heroOn && player.isPlaying ? "Pausar" : "Reproducir"}>
+              <div className="zl-wave" onClick={() => toggle(heroTrack)} role="button" aria-label={heroOn && player.isPlaying ? "Pausar" : "Reproducir"}>
                 {heroBars.map((h, i) => (
                   <span key={i} style={{
                     height: h,
@@ -416,7 +432,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <button className="zl-iconbtn zl-play-main" onClick={() => player.toggle(heroTrack)} aria-label={heroOn && player.isPlaying ? "Pausar" : "Reproducir"}>
+                  <button className="zl-iconbtn zl-play-main" onClick={() => toggle(heroTrack)} aria-label={heroOn && player.isPlaying ? "Pausar" : "Reproducir"}>
                     {heroOn && player.isPlaying ? <Pause /> : <Play />}
                   </button>
                   <span style={{ fontSize: "0.8rem", color: "var(--text-3)", fontVariantNumeric: "tabular-nums" }}>{timeDisplay}</span>
@@ -426,7 +442,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
 
               <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 6 }}>
                 {heroQueue.map((t, i) => {
-                  const on = player.playingId === t.id;
+                  const on = playingId === t.id;
                   return (
                     <div key={t.id} className={`zl-queue-item${on ? " is-active" : ""}`} onClick={() => selectQueue(i)} role="button" aria-label={`Reproducir ${t.title}`}>
                       <span style={{ width: 16, textAlign: "center", fontSize: "0.75rem", color: on ? "var(--lime)" : "var(--text-3)" }}>
@@ -453,9 +469,9 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <SectionHeader eyebrow="Lanzamientos destacados" title="Estrenos de la semana" desc="Lo nuevo, escogido a mano por nuestro equipo de curación." action="Ver todo" />
           <div className="zl-rail" data-reveal>
             {featured.map((t) => (
-              <button key={t.id} className="zl-release" onClick={() => player.toggle(t)} aria-label={`Reproducir ${t.title}`}>
+              <button key={t.id} className="zl-release" onClick={() => toggle(t)} aria-label={`Reproducir ${t.title}`}>
                 <Cover variant={t.cover} glyph={t.glyph} image={t.coverImage} />
-                <ReleasePlay on={player.playingId === t.id} playing={player.isPlaying} />
+                <ReleasePlay on={playingId === t.id} playing={player.isPlaying} />
                 <div className="zl-release__title">{t.title}</div>
                 <div className="zl-release__meta">{t.artist} · {t.mood}</div>
               </button>
@@ -470,9 +486,9 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <SectionHeader eyebrow="En tendencia" title="Lo más sonado ahora" desc="Los tracks que más se están descargando esta semana." action="Explorar catálogo" />
           <div className="zl-tracks" data-reveal>
             {trending.map((t, i) => {
-              const on = player.playingId === t.id;
+              const on = playingId === t.id;
               return (
-                <button key={t.id} className={`zl-track${on ? " is-playing" : ""}`} onClick={() => player.toggle(t)} aria-label={`Reproducir ${t.title}`}>
+                <button key={t.id} className={`zl-track${on ? " is-playing" : ""}`} onClick={() => toggle(t)} aria-label={`Reproducir ${t.title}`}>
                   <span className="zl-track__rank">{on ? (player.isPlaying ? <Pause size={13} /> : <Play size={13} />) : i + 1}</span>
                   <span className="zl-track__cover"><Cover variant={t.cover} glyph={t.glyph} radius={10} image={t.coverImage} /></span>
                   <span style={{ minWidth: 0 }}>
@@ -494,7 +510,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <SectionHeader eyebrow="Selección del equipo" title="Staff Picks" desc="Una pieza destacada y las que la acompañan, elegidas con criterio editorial." />
           <div data-reveal style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 40, alignItems: "stretch" }} className="zl-staff-grid">
             {/* Hero pick */}
-            <button className="zl-release" onClick={() => player.toggle(staffHero)} style={{ position: "relative" }} aria-label={`Reproducir ${staffHero.title}`}>
+            <button className="zl-release" onClick={() => toggle(staffHero)} style={{ position: "relative" }} aria-label={`Reproducir ${staffHero.title}`}>
               <div style={{ position: "relative", borderRadius: "var(--r-lg)", overflow: "hidden", aspectRatio: "16 / 11" }}>
                 {staffHero.coverImage ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -503,7 +519,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
                   <div style={{ position: "absolute", inset: 0, background: COVERS[staffHero.cover] }} />
                 )}
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 35%, rgba(0,0,0,0.78))" }} />
-                <span className="zl-release__play" style={{ width: 56, height: 56, ...(player.playingId === staffHero.id ? { opacity: 1, transform: "translateY(0) scale(1)" } : {}) }}>{player.playingId === staffHero.id && player.isPlaying ? <Pause size={22} /> : <Play size={22} />}</span>
+                <span className="zl-release__play" style={{ width: 56, height: 56, ...(playingId === staffHero.id ? { opacity: 1, transform: "translateY(0) scale(1)" } : {}) }}>{playingId === staffHero.id && player.isPlaying ? <Pause size={22} /> : <Play size={22} />}</span>
                 <div style={{ position: "absolute", left: 26, bottom: 24, right: 26 }}>
                   <span className="zl-tag" style={{ marginBottom: 12, display: "inline-block" }}>Pick de la semana</span>
                   <div style={{ fontSize: "1.7rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#fff" }}>{staffHero.title}</div>
@@ -525,9 +541,9 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {staffList.map((t, i) => {
-                  const on = player.playingId === t.id;
+                  const on = playingId === t.id;
                   return (
-                    <button key={t.id} className={`zl-track${on ? " is-playing" : ""}`} onClick={() => player.toggle(t)} style={{ gridTemplateColumns: "26px 46px 1fr auto" }} aria-label={`Reproducir ${t.title}`}>
+                    <button key={t.id} className={`zl-track${on ? " is-playing" : ""}`} onClick={() => toggle(t)} style={{ gridTemplateColumns: "26px 46px 1fr auto" }} aria-label={`Reproducir ${t.title}`}>
                       <span className="zl-track__rank">{on ? (player.isPlaying ? <Pause size={12} /> : <Play size={12} />) : i + 1}</span>
                       <span style={{ width: 46, height: 46 }}><Cover variant={t.cover} glyph={t.glyph} radius={9} image={t.coverImage} /></span>
                       <span style={{ minWidth: 0 }}>
@@ -551,11 +567,11 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <SectionHeader eyebrow="Novedades" title="Recién añadido" desc="Pistas frescas que acaban de entrar al catálogo." action="Ver novedades" />
           <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 24 }} className="zl-new-grid">
             {newMusic.map((t) => (
-              <button key={t.id} className="zl-release" onClick={() => player.toggle(t)} aria-label={`Reproducir ${t.title}`}>
+              <button key={t.id} className="zl-release" onClick={() => toggle(t)} aria-label={`Reproducir ${t.title}`}>
                 <div style={{ position: "relative" }}>
                   <Cover variant={t.cover} glyph={t.glyph} image={t.coverImage} />
                   <span className="zl-pill-new" style={{ position: "absolute", top: 12, left: 12 }}>Nuevo</span>
-                  <ReleasePlay on={player.playingId === t.id} playing={player.isPlaying} />
+                  <ReleasePlay on={playingId === t.id} playing={player.isPlaying} />
                 </div>
                 <div className="zl-release__title">{t.title}</div>
                 <div className="zl-release__meta">{t.artist} · {t.duration}</div>
@@ -629,9 +645,9 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           </div>
           <div data-reveal style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 24 }}>
             {filtered.map((t) => (
-              <button key={t.id} className="zl-release" onClick={() => player.toggle(t)} aria-label={`Reproducir ${t.title}`}>
+              <button key={t.id} className="zl-release" onClick={() => toggle(t)} aria-label={`Reproducir ${t.title}`}>
                 <Cover variant={t.cover} glyph={t.glyph} image={t.coverImage} />
-                <ReleasePlay on={player.playingId === t.id} playing={player.isPlaying} />
+                <ReleasePlay on={playingId === t.id} playing={player.isPlaying} />
                 <div className="zl-release__title">{t.title}</div>
                 <div className="zl-release__meta">{t.artist} · {t.bpm} BPM · {t.duration}</div>
                 <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
