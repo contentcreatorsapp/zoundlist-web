@@ -58,12 +58,11 @@ async function generateImage(prompt: string): Promise<string> {
       "content-type":  "application/json",
     },
     body: JSON.stringify({
-      model:           "dall-e-3",
+      model:   "dall-e-3",
       prompt,
-      n:               1,
-      size:            "1024x1024",
-      quality:         "standard",
-      response_format: "url",
+      n:       1,
+      size:    "1024x1024",
+      quality: "standard",
     }),
   });
 
