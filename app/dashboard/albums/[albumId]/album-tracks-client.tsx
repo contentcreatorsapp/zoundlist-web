@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { usePlayer } from "@/lib/player/context";
 import type { PlayerTrack } from "@/lib/player/types";
 import { COVERS } from "@/lib/catalog/covers";
 import type { Album, AlbumTrack } from "@/services/albums";
 import { PublishingAssistant } from "@/components/ai/PublishingAssistant";
+import { createClient } from "@/lib/supabase/client";
 
 function Play({ size = 14 }: { size?: number }) {
   return <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor"><path d="M8 5v14l11-7z" /></svg>;
@@ -17,6 +19,51 @@ function Pause({ size = 14 }: { size?: number }) {
 interface Props {
   album: Album;
   tracks: AlbumTrack[];
+}
+
+function BulkPublishBar({ tracks, albumId }: { tracks: AlbumTrack[]; albumId: string }) {
+  const router   = useRouter();
+  const drafts   = tracks.filter(t => !t.published);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+
+  if (drafts.length === 0) return null;
+
+  const publish = async () => {
+    if (!confirm(`¿Publicar los ${drafts.length} tracks en borrador de este álbum?`)) return;
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    const ids = drafts.map(t => t.id);
+    const { error: err } = await supabase
+      .from("tracks")
+      .update({ published: true, ai_status: "published" })
+      .in("id", ids)
+      .eq("album_id", albumId);
+    setLoading(false);
+    if (err) { setError(err.message); return; }
+    router.refresh();
+  };
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end",
+      marginBottom: 14, flexWrap: "wrap",
+    }}>
+      {error && <span style={{ fontSize: "0.8rem", color: "var(--orange)", flex: 1 }}>{error}</span>}
+      <span style={{ fontSize: "0.82rem", color: "var(--text-3)" }}>
+        {drafts.length} en borrador
+      </span>
+      <button
+        className="zl-btn zl-btn--primary zl-btn--sm"
+        onClick={publish}
+        disabled={loading}
+        style={{ fontSize: "0.8rem" }}
+      >
+        {loading ? "Publicando…" : `Publicar todos (${drafts.length})`}
+      </button>
+    </div>
+  );
 }
 
 export function AlbumTracksClient({ album, tracks }: Props) {
@@ -60,6 +107,7 @@ export function AlbumTracksClient({ album, tracks }: Props) {
   return (
     <div>
       <PublishingAssistant albumId={album.id} tracks={tracks} />
+      <BulkPublishBar tracks={tracks} albumId={album.id} />
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {tracks.map((track, i) => {
         const isCurrent = playingId === track.id;
