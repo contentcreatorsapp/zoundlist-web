@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import type { User } from "@supabase/supabase-js";
-import type { Catalog, CoverVariant } from "@/types/catalog";
+import type { Catalog } from "@/types/catalog";
 import { COVERS } from "@/lib/catalog/covers";
 import { Brand } from "@/components/brand";
 import { usePlayer } from "@/lib/player/context";
 import type { PlayerTrack } from "@/lib/player/types";
 import { signUpWithPassword, signInWithPassword, resetPassword, signInWithProvider } from "@/services/auth";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { Cover } from "@/components/ui/Cover";
 
 // Genre collection cover images (fixed curated set). Falls back to gradient.
 const GENRE_IMAGES: Record<string, string> = {
@@ -103,20 +104,6 @@ function OAuthButtons({ onProvider }: { onProvider: (p: "google" | "apple") => v
 
 // ─── Reusable pieces ─────────────────────────────────────────────────────────
 
-function Cover({ variant, glyph, radius, image }: { variant: CoverVariant; glyph?: string; radius?: number; image?: string | null }) {
-  return (
-    <div className="zl-cover" style={radius ? { borderRadius: radius } : undefined}>
-      {image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={image} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-      ) : (
-        <div style={{ position: "absolute", inset: 0, background: COVERS[variant] }} />
-      )}
-      <div className="zl-cover__vignette" />
-      {!image && glyph && <span className="zl-cover__glyph">{glyph}</span>}
-    </div>
-  );
-}
 
 function ReleasePlay({ on, playing, hasAudio = true, size = 18 }: { on: boolean; playing: boolean; hasAudio?: boolean; size?: number }) {
   if (!hasAudio) return null;
@@ -357,9 +344,9 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
           <Brand height={24} />
 
           <ul className="zl-nav__links zl-hide-md">
+            <li><a href="/radio" className="zl-nav__link">Radio</a></li>
             <li><a href="#featured" className="zl-nav__link">Descubrir</a></li>
             <li><a href="#genres" className="zl-nav__link">Géneros</a></li>
-            <li><a href="#moods" className="zl-nav__link">Moods</a></li>
             <li><a href="#license" className="zl-nav__link">Licencias</a></li>
             <li><a href="#pricing" className="zl-nav__link">Precios</a></li>
           </ul>
