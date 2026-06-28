@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { Catalog, Track, CoverVariant } from "@/types/catalog";
-import { COVERS } from "@/lib/catalog/covers";
-import { Cover } from "@/components/ui/Cover";
 import { Brand } from "@/components/brand";
 import { usePlayer } from "@/lib/player/context";
 import { loadPlayer } from "@/lib/player/storage";
@@ -13,12 +11,24 @@ import { EDITORIAL_PLAYLISTS, ORIGINALS_CONFIG } from "@/lib/radio/playlists";
 import type { EditorialPlaylist } from "@/lib/radio/types";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
+// ── Cinematic gradients — feel like tinted photography, not blob mesh ─────────
+const CINEMA: Record<CoverVariant, string> = {
+  violet:  "linear-gradient(155deg, #08001a 0%, #22066b 45%, #0f0230 100%)",
+  lime:    "linear-gradient(155deg, #041100 0%, #143600 45%, #081b00 100%)",
+  orange:  "linear-gradient(155deg, #190400 0%, #5c1800 45%, #2e0900 100%)",
+  magenta: "linear-gradient(155deg, #170011 0%, #5c0044 45%, #2d0021 100%)",
+  teal:    "linear-gradient(155deg, #001212 0%, #004240 45%, #001c1c 100%)",
+  gold:    "linear-gradient(155deg, #130d00 0%, #4c3400 45%, #241a00 100%)",
+  ice:     "linear-gradient(155deg, #000c18 0%, #002852 45%, #001230 100%)",
+  ember:   "linear-gradient(155deg, #190300 0%, #5c1100 45%, #2e0700 100%)",
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function getGreeting(): string {
+function getGreetingParts(): [string, string] {
   const h = new Date().getHours();
-  if (h < 12) return "Buenos días";
-  if (h < 18) return "Buenas tardes";
-  return "Buenas noches";
+  if (h < 12) return ["Buenos ", "días"];
+  if (h < 18) return ["Buenas ", "tardes"];
+  return ["Buenas ", "noches"];
 }
 
 function toPlayerTrack(t: Track): PlayerTrack | null {
@@ -30,248 +40,270 @@ function tracksForStation(tracks: Track[], pl: EditorialPlaylist): Track[] {
   return tracks.filter(t => pl.genreSlugs.includes(t.genre) || pl.moodKeywords.some(k => t.mood.toLowerCase().includes(k.toLowerCase())));
 }
 
+function stationCoverSrc(tracks: Track[], pl: EditorialPlaylist): string | null {
+  return tracksForStation(tracks, pl).find(t => !!t.coverImage)?.coverImage ?? null;
+}
+
 const VARIANTS: CoverVariant[] = ["violet", "lime", "orange", "magenta", "teal", "gold", "ice", "ember"];
 function getArtists(tracks: Track[]): { name: string; trackCount: number; variant: CoverVariant }[] {
-  const countMap = new Map<string, number>();
-  const varMap   = new Map<string, CoverVariant>();
-  let idx = 0;
+  const cm = new Map<string, number>();
+  const vm = new Map<string, CoverVariant>();
+  let i = 0;
   for (const t of tracks) {
-    countMap.set(t.artist, (countMap.get(t.artist) ?? 0) + 1);
-    if (!varMap.has(t.artist)) { varMap.set(t.artist, VARIANTS[idx % VARIANTS.length]); idx++; }
+    cm.set(t.artist, (cm.get(t.artist) ?? 0) + 1);
+    if (!vm.has(t.artist)) { vm.set(t.artist, VARIANTS[i % VARIANTS.length]); i++; }
   }
-  return [...countMap.entries()].map(([name, trackCount]) => ({ name, trackCount, variant: varMap.get(name)! })).sort((a, b) => b.trackCount - a.trackCount).slice(0, 12);
+  return [...cm.entries()].map(([name, trackCount]) => ({ name, trackCount, variant: vm.get(name)! }))
+    .sort((a, b) => b.trackCount - a.trackCount).slice(0, 10);
 }
 
 const LIKED_KEY = "zl_liked_tracks";
 function getLiked(): Set<string> { try { return new Set(JSON.parse(localStorage.getItem(LIKED_KEY) ?? "[]")); } catch { return new Set(); } }
 function mutateLiked(id: string): boolean { const s = getLiked(); s.has(id) ? s.delete(id) : s.add(id); localStorage.setItem(LIKED_KEY, JSON.stringify([...s])); return s.has(id); }
 
+const MOOD_FILTERS = [
+  { label: "Para ti",       keywords: [] as string[] },
+  { label: "Concentración", keywords: ["concentrado", "focus"] },
+  { label: "Relajación",    keywords: ["tranquilo", "relajado"] },
+  { label: "Energía",       keywords: ["energético", "energetico", "motivacional"] },
+  { label: "Melancolía",    keywords: ["melancólico", "melancolico"] },
+  { label: "Inspiración",   keywords: ["épico", "epico"] },
+];
+function filterPlaylists(pls: EditorialPlaylist[], f: typeof MOOD_FILTERS[0]) {
+  if (!f.keywords.length) return pls;
+  return pls.filter(pl => pl.moodKeywords.some(k => f.keywords.some(fk => k.toLowerCase().includes(fk))));
+}
+
 // ── Icons ─────────────────────────────────────────────────────────────────────
-const PlayI  = ({ s = 18 }: { s?: number }) => <svg viewBox="0 0 24 24" width={s} height={s} fill="currentColor"><path d="M8 5v14l11-7z"/></svg>;
-const PauseI = ({ s = 18 }: { s?: number }) => <svg viewBox="0 0 24 24" width={s} height={s} fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>;
-const HomeI  = () => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>;
-const WaveI  = () => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm9-2.17v10.34c1.86-.95 3-2.85 3-5.17s-1.14-4.22-3-5.17z"/><path d="M16.5 12A4.5 4.5 0 0014 7.97v8.05A4.5 4.5 0 0016.5 12z"/></svg>;
-const MoodI  = () => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM9.5 15.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm5 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1-6.5c0 1.66-1.34 3-3 3s-3-1.34-3-3h6z"/></svg>;
-const HeartI = ({ on }: { on: boolean }) => <svg viewBox="0 0 24 24" width={16} height={16} fill={on ? "var(--brand)" : "none"} stroke={on ? "var(--brand)" : "currentColor"} strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>;
+const PlayI   = ({ s = 18 }: { s?: number }) => <svg viewBox="0 0 24 24" width={s} height={s} fill="currentColor"><path d="M8 5v14l11-7z"/></svg>;
+const PauseI  = ({ s = 18 }: { s?: number }) => <svg viewBox="0 0 24 24" width={s} height={s} fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>;
+const HeartI  = ({ on }: { on: boolean }) => <svg viewBox="0 0 24 24" width={16} height={16} fill={on ? "var(--brand)" : "none"} stroke={on ? "var(--brand)" : "rgba(255,255,255,0.5)"} strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>;
+const HomeI   = () => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>;
+const SearchI = () => <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+const LibI    = () => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg>;
+const FavI    = () => <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>;
+const RecentI = () => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor"><path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm-1 5v5l4 2.5.7-1.2L13 12V8h-1z"/></svg>;
+const WaveI   = () => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm9-2.17v10.34c1.86-.95 3-2.85 3-5.17s-1.14-4.22-3-5.17z"/></svg>;
+const TrendI  = () => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>;
+const NewI    = () => <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>;
 
-// ── Sidebar nav link ──────────────────────────────────────────────────────────
-function SbLink({ href, icon, label, active, onClick }: { href: string; icon: React.ReactNode; label: string; active?: boolean; onClick?: () => void }) {
+// ── PhotoCard (full-bleed base) ───────────────────────────────────────────────
+function PhotoCard({ src, gradient, radius = 10, style, children, onClick }: {
+  src: string | null; gradient: string; radius?: number;
+  style?: React.CSSProperties; children?: React.ReactNode; onClick?: () => void;
+}) {
   return (
-    <a href={href} onClick={onClick} style={{
-      display: "flex", alignItems: "center", gap: 14,
-      padding: "10px 12px", borderRadius: 8,
-      color: active ? "#fff" : "rgba(255,255,255,0.6)", textDecoration: "none",
-      fontSize: "0.9rem", fontWeight: 600,
-    }}>
-      {icon}<span>{label}</span>
-    </a>
-  );
-}
-
-// ── Section heading ────────────────────────────────────────────────────────────
-function SecH({ title }: { title: string }) {
-  return <h2 style={{ fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#fff", marginBottom: 20 }}>{title}</h2>;
-}
-
-// ── Quick play compact item (Spotify home grid) ───────────────────────────────
-function QuickItem({ track, active, playing, onPlay }: { track: Track; active: boolean; playing: boolean; onPlay: () => void }) {
-  return (
-    <button
-      onClick={onPlay}
-      aria-label={`Escuchar ${track.title}`}
-      style={{
-        display: "flex", alignItems: "center",
-        background: active ? "rgba(149,249,8,0.1)" : "rgba(255,255,255,0.08)",
-        borderRadius: 6, overflow: "hidden",
-        border: "none", cursor: "pointer", height: 64,
-        color: "#fff", textAlign: "left", width: "100%",
-        transition: "background 0.15s",
-      }}
-    >
-      <div style={{ width: 64, height: 64, flexShrink: 0 }}>
-        <Cover variant={track.cover} image={track.coverImage} />
+    <div onClick={onClick} style={{ position: "relative", overflow: "hidden", borderRadius: radius, cursor: onClick ? "pointer" : "default", ...style }}>
+      {src
+        ? <img src={src} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        : <div style={{ position: "absolute", inset: 0, background: gradient }} />
+      }
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.94) 0%, rgba(0,0,0,0.5) 35%, rgba(0,0,0,0.15) 70%, rgba(0,0,0,0.05) 100%)" }} />
+      <div style={{ position: "relative", height: "100%", display: "flex", flexDirection: "column" }}>
+        {children}
       </div>
-      <span style={{
-        flex: 1, fontSize: "0.87rem", fontWeight: 700,
-        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        padding: "0 14px", color: active ? "var(--brand)" : "#fff"
-      }}>
-        {track.title}
-      </span>
-      <span style={{
-        width: 44, height: 44, borderRadius: "50%",
-        background: "var(--brand)", color: "var(--brand-ink)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0, marginRight: 10,
-        opacity: active ? 1 : 0,
-        boxShadow: "0 4px 16px rgba(149,249,8,0.35)",
-        transition: "opacity 0.2s",
-      }} className="qitem-play">
-        {active && playing ? <PauseI s={16} /> : <PlayI s={16} />}
-      </span>
-    </button>
-  );
-}
-
-// ── Mix card (Spotify playlist card) ─────────────────────────────────────────
-function MixCard({ playlist, trackCount, active, playing, onPlay }: { playlist: EditorialPlaylist; trackCount: number; active: boolean; playing: boolean; onPlay: () => void }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={onPlay}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      aria-label={`Escuchar ${playlist.title}`}
-      style={{
-        position: "relative", borderRadius: 8, overflow: "hidden",
-        border: "none", cursor: "pointer", background: "#171717",
-        textAlign: "left", padding: 0, display: "block", width: "100%",
-        transform: hovered ? "translateY(-4px)" : "none",
-        boxShadow: hovered ? "0 20px 60px rgba(0,0,0,0.55)" : "none",
-        transition: "transform 0.2s ease, box-shadow 0.2s",
-      }}
-    >
-      {/* Cover art — square */}
-      <div style={{ width: "100%", aspectRatio: "1", overflow: "hidden" }}>
-        {playlist.coverImage
-          ? <img src={playlist.coverImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          : <div style={{ width: "100%", height: "100%", background: COVERS[playlist.coverVariant] }} />
-        }
-      </div>
-      {/* Play button (hover) */}
-      <div style={{
-        position: "absolute", right: 12, bottom: 72,
-        width: 44, height: 44, borderRadius: "50%",
-        background: "var(--brand)", color: "var(--brand-ink)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        opacity: (hovered || active) ? 1 : 0,
-        transform: (hovered || active) ? "translateY(0)" : "translateY(8px)",
-        transition: "opacity 0.2s, transform 0.2s",
-        boxShadow: "0 8px 24px rgba(149,249,8,0.4)",
-      }}>
-        {active && playing ? <PauseI s={20} /> : <PlayI s={20} />}
-      </div>
-      {/* Info */}
-      <div style={{ padding: "12px 14px 16px" }}>
-        <div style={{ fontSize: "0.94rem", fontWeight: 700, color: "#fff", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {playlist.title}
-        </div>
-        <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.55)", lineHeight: 1.4 }}>
-          {playlist.description}
-        </div>
-        {trackCount > 0 && (
-          <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.38)", marginTop: 6 }}>{trackCount} tracks</div>
-        )}
-      </div>
-    </button>
-  );
-}
-
-// ── Trending row ──────────────────────────────────────────────────────────────
-function TrendRow({ track, rank, active, playing, onPlay }: { track: Track; rank: number; active: boolean; playing: boolean; onPlay: () => void }) {
-  const [liked, setLiked] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  useEffect(() => { setLiked(getLiked().has(track.id)); }, [track.id]);
-  const handleLike = (e: React.MouseEvent) => { e.stopPropagation(); setLiked(mutateLiked(track.id)); };
-  return (
-    <div
-      role="button" tabIndex={0}
-      onClick={onPlay} onKeyDown={e => e.key === "Enter" && onPlay()}
-      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      aria-label={`Escuchar ${track.title}`}
-      style={{
-        display: "grid",
-        gridTemplateColumns: "24px 44px 1fr auto auto auto",
-        gap: 14, alignItems: "center",
-        padding: "8px 14px", borderRadius: 6,
-        cursor: "pointer", color: "#fff", textAlign: "left",
-        background: active ? "rgba(149,249,8,0.06)" : hovered ? "rgba(255,255,255,0.06)" : "transparent",
-        transition: "background 0.15s", width: "100%",
-      }}
-    >
-      <span style={{ fontSize: "0.88rem", fontWeight: 700, color: active ? "var(--brand)" : "rgba(255,255,255,0.42)", textAlign: "center" }}>
-        {active ? (playing ? <PauseI s={14} /> : <PlayI s={14} />) : rank}
-      </span>
-      <span style={{ width: 44, height: 44, borderRadius: 4, overflow: "hidden", display: "block", flexShrink: 0 }}>
-        <Cover variant={track.cover} image={track.coverImage} radius={4} />
-      </span>
-      <span style={{ minWidth: 0 }}>
-        <span style={{ fontSize: "0.91rem", fontWeight: 600, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: active ? "var(--brand)" : "#fff" }}>
-          {track.title}
-        </span>
-        <span style={{ fontSize: "0.77rem", color: "rgba(255,255,255,0.42)", display: "block" }}>{track.artist}</span>
-      </span>
-      <span style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.42)", whiteSpace: "nowrap" }}>{track.mood}</span>
-      <button onClick={handleLike} aria-label={liked ? "Quitar me gusta" : "Me gusta"}
-        style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", padding: 6, opacity: hovered || liked ? 1 : 0, transition: "opacity 0.15s" }}>
-        <HeartI on={liked} />
-      </button>
-      <span style={{ fontSize: "0.79rem", color: "rgba(255,255,255,0.42)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{track.duration}</span>
     </div>
   );
 }
 
-// ── Small card (horizontal scroll) ───────────────────────────────────────────
-function SmallCard({ track, active, playing, onPlay }: { track: Track; active: boolean; playing: boolean; onPlay: () => void }) {
-  const [hovered, setHovered] = useState(false);
+// ── Sidebar helpers ───────────────────────────────────────────────────────────
+function SbSection({ label }: { label: string }) {
+  return <p style={{ fontSize: "0.63rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "rgba(255,255,255,0.28)", padding: "14px 10px 4px" }}>{label}</p>;
+}
+function SbItem({ icon, label, active, href, indent, onClick }: { icon?: React.ReactNode; label: string; active?: boolean; href: string; indent?: boolean; onClick?: () => void }) {
   return (
-    <button onClick={onPlay} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      aria-label={`Escuchar ${track.title}`}
-      style={{ flexShrink: 0, width: 170, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", color: "#fff", padding: 0 }}>
-      <div style={{ width: 170, height: 170, borderRadius: 10, overflow: "hidden", position: "relative", marginBottom: 12, transform: hovered ? "translateY(-4px)" : "none", transition: "transform 0.2s" }}>
-        <Cover variant={track.cover} image={track.coverImage} glyph={track.glyph} radius={10} />
-        <div style={{
-          position: "absolute", right: 10, bottom: 10,
-          width: 40, height: 40, borderRadius: "50%",
-          background: "var(--brand)", color: "var(--brand-ink)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          opacity: (hovered || active) ? 1 : 0,
-          transform: (hovered || active) ? "translateY(0)" : "translateY(8px)",
-          transition: "opacity 0.2s, transform 0.2s",
-        }}>
-          {active && playing ? <PauseI /> : <PlayI />}
+    <a href={href} onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12, padding: indent ? "7px 10px 7px 20px" : "8px 10px", borderRadius: 6, textDecoration: "none", color: active ? "#fff" : "rgba(255,255,255,0.52)", fontSize: "0.86rem", fontWeight: active ? 700 : 500, background: active ? "rgba(255,255,255,0.09)" : "transparent" }}>
+      {icon && <span style={{ flexShrink: 0, opacity: active ? 1 : 0.65 }}>{icon}</span>}
+      <span>{label}</span>
+    </a>
+  );
+}
+
+// ── Section heading ─────────────────────────────────────────────────────────────
+function SecHead({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <h2 style={{ fontSize: "1.35rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#fff", marginBottom: subtitle ? 4 : 0 }}>{title}</h2>
+      {subtitle && <p style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.42)" }}>{subtitle}</p>}
+    </div>
+  );
+}
+
+// ── NOW PLAYING hero card ─────────────────────────────────────────────────────
+function NowPlayingCard({ track, isPlaying, onToggle }: { track: Track; isPlaying: boolean; onToggle: () => void }) {
+  return (
+    <PhotoCard src={track.coverImage} gradient={CINEMA[track.cover]} style={{ height: "100%", borderRadius: 14 }}>
+      <div style={{ flex: 1 }} />
+      <div style={{ padding: "24px 24px 28px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <span className="rp-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--brand)", display: "block", flexShrink: 0 }} />
+          <span style={{ fontSize: "0.62rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.14em", color: "rgba(255,255,255,0.72)" }}>En Radio Ahora</span>
+        </div>
+        <h2 style={{ fontSize: "clamp(1.4rem, 2.5vw, 1.9rem)", fontWeight: 700, letterSpacing: "-0.025em", color: "#fff", marginBottom: 6, lineHeight: 1.15 }}>{track.title}</h2>
+        <p style={{ fontSize: "0.84rem", color: "rgba(255,255,255,0.52)", marginBottom: 24 }}>{track.artist} · {track.mood}</p>
+        <button onClick={onToggle} style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--brand)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand-ink)", boxShadow: "0 8px 32px rgba(149,249,8,0.4)" }}>
+          {isPlaying ? <PauseI s={22} /> : <PlayI s={22} />}
+        </button>
+      </div>
+    </PhotoCard>
+  );
+}
+
+// ── Section shortcut card ─────────────────────────────────────────────────────
+function ShortcutCard({ title, subtitle, src, variant, href }: { title: string; subtitle: string; src: string | null; variant: CoverVariant; href: string }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <a href={href} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ display: "block", textDecoration: "none", height: "100%", transform: hov ? "scale(1.02)" : "scale(1)", transition: "transform 0.18s ease" }}>
+      <PhotoCard src={src} gradient={CINEMA[variant]} style={{ height: "100%", borderRadius: 10 }}>
+        <div style={{ flex: 1 }} />
+        <div style={{ padding: "10px 14px 14px" }}>
+          <div style={{ fontSize: "0.84rem", fontWeight: 700, color: "#fff", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>
+          <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.48)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{subtitle}</div>
+        </div>
+      </PhotoCard>
+    </a>
+  );
+}
+
+// ── Continue listening card (landscape) ───────────────────────────────────────
+function ContinueCard({ track, active, playing, onPlay }: { track: Track; active: boolean; playing: boolean; onPlay: () => void }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button onClick={onPlay} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ flexShrink: 0, width: 270, border: "none", background: "transparent", cursor: "pointer", padding: 0 }}>
+      <PhotoCard src={track.coverImage} gradient={CINEMA[track.cover]} style={{ width: 270, height: 160, borderRadius: 10 }}>
+        {active && (
+          <div style={{ padding: "10px 12px 0", display: "flex", alignItems: "center", gap: 6 }}>
+            <span className="rp-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--brand)", display: "block" }} />
+            <span style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--brand)" }}>Reproduciendo</span>
+          </div>
+        )}
+        <div style={{ flex: 1 }} />
+        <div style={{ padding: "0 12px 12px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", gap: 5, marginBottom: 6 }}>
+              <span style={{ fontSize: "0.57rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.14)", borderRadius: 3, padding: "2px 6px" }}>{track.genre}</span>
+              <span style={{ fontSize: "0.57rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.14)", borderRadius: 3, padding: "2px 6px" }}>{track.mood}</span>
+            </div>
+            <div style={{ fontSize: "0.87rem", fontWeight: 700, color: active ? "var(--brand)" : "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 188 }}>{track.title}</div>
+          </div>
+          <div style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--brand)", color: "var(--brand-ink)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: hov || active ? 1 : 0, transform: hov || active ? "translateY(0)" : "translateY(6px)", transition: "all 0.2s" }}>
+            {active && playing ? <PauseI s={14} /> : <PlayI s={14} />}
+          </div>
+        </div>
+      </PhotoCard>
+    </button>
+  );
+}
+
+// ── Station card (Mix del día) ─────────────────────────────────────────────────
+function StationCard({ playlist, coverSrc, trackCount, active, playing, onPlay }: {
+  playlist: EditorialPlaylist; coverSrc: string | null; trackCount: number; active: boolean; playing: boolean; onPlay: () => void;
+}) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button onClick={onPlay} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ flexShrink: 0, width: 200, border: "none", background: "transparent", cursor: "pointer", padding: 0, textAlign: "left" }}>
+      <PhotoCard src={coverSrc} gradient={CINEMA[playlist.coverVariant]} style={{ width: 200, height: 200, borderRadius: 12 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", padding: "12px 12px 0 0" }}>
+          <div style={{ width: 42, height: 42, borderRadius: "50%", background: "var(--brand)", color: "var(--brand-ink)", display: "flex", alignItems: "center", justifyContent: "center", opacity: hov || active ? 1 : 0, transform: hov || active ? "translateY(0) scale(1)" : "translateY(6px) scale(0.85)", transition: "all 0.2s", boxShadow: "0 8px 24px rgba(149,249,8,0.4)" }}>
+            {active && playing ? <PauseI s={18} /> : <PlayI s={18} />}
+          </div>
+        </div>
+        <div style={{ flex: 1 }} />
+        <div style={{ padding: "0 14px 14px" }}>
+          <div style={{ fontSize: "0.92rem", fontWeight: 700, color: active ? "var(--brand)" : "#fff", marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{playlist.title}</div>
+          <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.48)", lineHeight: 1.4, overflow: "hidden", maxHeight: "2.8em" }}>{playlist.description}</div>
+          {trackCount > 0 && <div style={{ fontSize: "0.62rem", color: "rgba(255,255,255,0.28)", marginTop: 5 }}>{trackCount} tracks</div>}
+        </div>
+      </PhotoCard>
+    </button>
+  );
+}
+
+// ── Trending card (numbered) ──────────────────────────────────────────────────
+function TrendCard({ track, rank, active, playing, onPlay }: { track: Track; rank: number; active: boolean; playing: boolean; onPlay: () => void }) {
+  const [hov, setHov] = useState(false);
+  const [liked, setLiked] = useState(false);
+  useEffect(() => { setLiked(getLiked().has(track.id)); }, [track.id]);
+  const handleLike = (e: React.MouseEvent) => { e.stopPropagation(); setLiked(mutateLiked(track.id)); };
+  return (
+    <button onClick={onPlay} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ flexShrink: 0, width: 185, border: "none", background: "transparent", cursor: "pointer", padding: 0, textAlign: "left" }}>
+      <div style={{ position: "relative", width: 185, height: 185, borderRadius: 10, overflow: "hidden", marginBottom: 11 }}>
+        {track.coverImage
+          ? <img src={track.coverImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", transform: hov ? "scale(1.06)" : "scale(1)", transition: "transform 0.35s" }} />
+          : <div style={{ width: "100%", height: "100%", background: CINEMA[track.cover], transform: hov ? "scale(1.06)" : "scale(1)", transition: "transform 0.35s" }} />
+        }
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.05) 60%)" }} />
+        <span style={{ position: "absolute", left: 12, bottom: 10, fontSize: "2.2rem", fontWeight: 900, color: "rgba(255,255,255,0.9)", lineHeight: 1, textShadow: "0 2px 16px rgba(0,0,0,0.9)" }}>{rank}</span>
+        <button onClick={handleLike} style={{ position: "absolute", right: 8, top: 8, background: "none", border: "none", cursor: "pointer", padding: 6, opacity: hov || liked ? 1 : 0, transition: "opacity 0.18s" }}><HeartI on={liked} /></button>
+        <div style={{ position: "absolute", right: 10, bottom: 10, width: 36, height: 36, borderRadius: "50%", background: "var(--brand)", color: "var(--brand-ink)", display: "flex", alignItems: "center", justifyContent: "center", opacity: hov || active ? 1 : 0, transform: hov || active ? "scale(1)" : "scale(0.8)", transition: "all 0.18s" }}>
+          {active && playing ? <PauseI s={14} /> : <PlayI s={14} />}
         </div>
       </div>
-      <div style={{ fontSize: "0.9rem", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{track.title}</div>
-      <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.5)", marginTop: 4 }}>{track.artist}</div>
+      <div style={{ fontSize: "0.87rem", fontWeight: 700, color: active ? "var(--brand)" : "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{track.title}</div>
+      <div style={{ fontSize: "0.73rem", color: "rgba(255,255,255,0.44)", marginTop: 3 }}>{track.artist}</div>
     </button>
   );
 }
 
-// ── Circular artist card ──────────────────────────────────────────────────────
-function ArtistCard({ name, trackCount, variant, onPlay }: { name: string; trackCount: number; variant: CoverVariant; onPlay: () => void }) {
-  const [hovered, setHovered] = useState(false);
+// ── New track card ─────────────────────────────────────────────────────────────
+function NewCard({ track, active, playing, onPlay }: { track: Track; active: boolean; playing: boolean; onPlay: () => void }) {
+  const [hov, setHov] = useState(false);
   return (
-    <button onClick={onPlay} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      aria-label={`Escuchar ${name}`}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, flexShrink: 0, width: 150, border: "none", background: "transparent", cursor: "pointer", textAlign: "center", padding: 0, transform: hovered ? "scale(1.05)" : "scale(1)", transition: "transform 0.2s" }}>
-      <div style={{ width: 150, height: 150, borderRadius: "50%", position: "relative", overflow: "hidden", background: COVERS[variant], boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
-        <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.8rem", opacity: 0.35, color: "#fff" }}>♪</span>
+    <button onClick={onPlay} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ flexShrink: 0, width: 175, border: "none", background: "transparent", cursor: "pointer", padding: 0, textAlign: "left" }}>
+      <div style={{ position: "relative", width: 175, height: 175, borderRadius: 10, overflow: "hidden", marginBottom: 10 }}>
+        {track.coverImage
+          ? <img src={track.coverImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", transform: hov ? "scale(1.06)" : "scale(1)", transition: "transform 0.35s" }} />
+          : <div style={{ width: "100%", height: "100%", background: CINEMA[track.cover], transform: hov ? "scale(1.06)" : "scale(1)", transition: "transform 0.35s" }} />
+        }
+        <span style={{ position: "absolute", top: 9, left: 9, fontSize: "0.57rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", background: "var(--brand)", color: "var(--brand-ink)", borderRadius: 4, padding: "3px 8px" }}>Nuevo</span>
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: hov || active ? 1 : 0, transition: "opacity 0.18s" }}>
+          <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--brand)", color: "var(--brand-ink)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 24px rgba(149,249,8,0.4)" }}>
+            {active && playing ? <PauseI s={18} /> : <PlayI s={18} />}
+          </div>
+        </div>
       </div>
-      <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 150 }}>{name}</span>
-      <span style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.5)" }}>{trackCount} {trackCount === 1 ? "track" : "tracks"}</span>
+      <div style={{ fontSize: "0.86rem", fontWeight: 700, color: active ? "var(--brand)" : "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{track.title}</div>
+      <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.44)", marginTop: 3 }}>{track.artist}</div>
     </button>
   );
 }
 
-// ── Mood tile ─────────────────────────────────────────────────────────────────
-function MoodTile({ mood, onPlay, disabled }: { mood: { slug: string; name: string; cover: CoverVariant; trackCount: number }; onPlay: () => void; disabled: boolean }) {
-  const [hovered, setHovered] = useState(false);
+// ── Mood tile ──────────────────────────────────────────────────────────────────
+function MoodTile({ mood, onPlay, hasContent }: { mood: { slug: string; name: string; cover: CoverVariant; trackCount: number }; onPlay: () => void; hasContent: boolean }) {
+  const [hov, setHov] = useState(false);
   return (
-    <button onClick={onPlay} disabled={disabled} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      aria-label={`Escuchar ${mood.name}`}
-      style={{
-        position: "relative", borderRadius: 8, overflow: "hidden",
-        border: "none", cursor: disabled ? "default" : "pointer",
-        height: 100, display: "flex", flexDirection: "column",
-        justifyContent: "flex-end", alignItems: "flex-start",
-        padding: 16, opacity: disabled ? 0.45 : 1,
-        transform: hovered && !disabled ? "scale(1.03)" : "scale(1)",
-        transition: "transform 0.2s",
-      }}>
-      <div style={{ position: "absolute", inset: 0, background: COVERS[mood.cover], transform: hovered ? "scale(1.06)" : "scale(1)", transition: "transform 0.4s" }} />
-      <span style={{ position: "relative", fontSize: "1.05rem", fontWeight: 700, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{mood.name}</span>
-      <span style={{ position: "relative", fontSize: "0.72rem", color: "rgba(255,255,255,0.7)", marginTop: 2 }}>{mood.trackCount} tracks</span>
+    <button onClick={onPlay} disabled={!hasContent} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ border: "none", background: "transparent", cursor: hasContent ? "pointer" : "default", padding: 0, width: "100%", opacity: hasContent ? 1 : 0.38 }}>
+      <div style={{ position: "relative", borderRadius: 10, overflow: "hidden", height: 100, background: CINEMA[mood.cover], transform: hov && hasContent ? "scale(1.02)" : "scale(1)", transition: "transform 0.2s" }}>
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.35) 100%)" }} />
+        <div style={{ position: "relative", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px" }}>
+          <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "#fff", textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>{mood.name}</span>
+          <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.48)", marginTop: 4 }}>{mood.trackCount} tracks</span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// ── Artist circle ──────────────────────────────────────────────────────────────
+function ArtistCircle({ name, trackCount, variant, onPlay }: { name: string; trackCount: number; variant: CoverVariant; onPlay: () => void }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button onClick={onPlay} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ flexShrink: 0, width: 145, border: "none", background: "transparent", cursor: "pointer", padding: 0, transform: hov ? "scale(1.04)" : "scale(1)", transition: "transform 0.2s" }}>
+      <div style={{ width: 145, height: 145, borderRadius: "50%", background: CINEMA[variant], overflow: "hidden", position: "relative", marginBottom: 11, boxShadow: "0 8px 32px rgba(0,0,0,0.55)" }}>
+        <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.6rem", opacity: 0.28, color: "#fff" }}>♪</span>
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 60%)" }} />
+      </div>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: "0.86rem", fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+        <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.44)", marginTop: 3 }}>{trackCount} {trackCount === 1 ? "track" : "tracks"}</div>
+      </div>
     </button>
   );
 }
@@ -279,23 +311,34 @@ function MoodTile({ mood, onPlay, disabled }: { mood: { slug: string; name: stri
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function RadioClient({ catalog }: { catalog: Catalog }) {
   const { tracks, moods } = catalog;
-
   const player    = usePlayer();
   const playingId = player.track?.id ?? null;
   const allPT     = tracks.map(toPlayerTrack).filter((t): t is PlayerTrack => t !== null);
 
-  const [user,   setUser]   = useState<User | null>(null);
-  const [recent, setRecent] = useState<Track[]>([]);
-  const [greeting, setG]   = useState("");
-  const [menuOpen, setMenu] = useState(false);
+  const [user,        setUser]   = useState<User | null>(null);
+  const [recent,      setRecent] = useState<Track[]>([]);
+  const [greetPrefix, setGP]    = useState("");
+  const [greetAccent, setGA]    = useState("");
+  const [menuOpen,    setMenu]  = useState(false);
+  const [moodFilter,  setFilter]= useState(MOOD_FILTERS[0]);
 
-  const featured   = tracks.filter(t => t.staffHero || t.featured || t.staffPick);
-  const quickItems = [...featured, ...tracks.filter(t => !featured.includes(t))].slice(0, 6);
-  const trending   = tracks.filter(t => t.trending);
-  const newTracks  = tracks.filter(t => t.isNew);
-  const artists    = getArtists(tracks);
+  const heroTrack = player.track
+    ? (tracks.find(t => t.id === player.track!.id) ?? tracks.find(t => t.staffHero) ?? tracks.find(t => t.featured) ?? tracks[0])
+    : (tracks.find(t => t.staffHero) ?? tracks.find(t => t.featured) ?? tracks[0]);
 
-  useEffect(() => { setG(getGreeting()); }, []);
+  const trending         = tracks.filter(t => t.trending);
+  const newTracks        = tracks.filter(t => t.isNew);
+  const artists          = getArtists(tracks);
+  const visiblePlaylists = filterPlaylists(EDITORIAL_PLAYLISTS, moodFilter);
+
+  const shortcutBgs = {
+    mix:   stationCoverSrc(tracks, EDITORIAL_PLAYLISTS[0]),
+    trend: trending.find(t => !!t.coverImage)?.coverImage ?? null,
+    fresh: newTracks.find(t => !!t.coverImage)?.coverImage ?? null,
+    disc:  [...tracks].reverse().find(t => !!t.coverImage)?.coverImage ?? null,
+  };
+
+  useEffect(() => { const [p, a] = getGreetingParts(); setGP(p); setGA(a); }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -309,7 +352,7 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
     const saved = loadPlayer();
     if (saved.queue?.length) {
       const ids = new Set(saved.queue.map(pt => pt.id));
-      setRecent(tracks.filter(t => ids.has(t.id)).slice(0, 6));
+      setRecent(tracks.filter(t => ids.has(t.id)).slice(0, 8));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -327,152 +370,168 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
     if (q.length) player.playTrack(q[0], q);
   };
 
-  const isStationActive = (pl: EditorialPlaylist) =>
-    !!playingId && tracksForStation(tracks, pl).some(t => t.id === playingId);
+  const isStationActive = (pl: EditorialPlaylist) => !!playingId && tracksForStation(tracks, pl).some(t => t.id === playingId);
 
   const playMood = (moodName: string) => {
     const q = tracks.filter(t => t.mood.toLowerCase().includes(moodName.toLowerCase().split(" ")[0]) && !!t.audioUrl).map(toPlayerTrack).filter((x): x is PlayerTrack => x !== null);
     if (q.length) player.playTrack(q[0], q);
   };
 
-  // ── Shared constants ────────────────────────────────────────────────────────
-  const SB_W = 260;  // sidebar width px
-  const PAD  = 40;   // horizontal padding px
+  const SB_W = 240;
+  const PAD  = 48;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#0D0D0D" }}>
 
       {/* ── SIDEBAR ──────────────────────────────────────────────────────────── */}
-      <aside style={{
-        width: SB_W, flexShrink: 0, position: "fixed", left: 0, top: 0, bottom: 80,
-        background: "#111", borderRight: "1px solid rgba(255,255,255,0.1)",
-        overflowY: "auto", zIndex: 50, display: "flex", flexDirection: "column",
-        padding: "20px 10px 16px",
-        transform: menuOpen ? "translateX(0)" : undefined,
-      }} className={`zl-radio-sidebar${menuOpen ? " is-open" : ""}`}>
+      <aside className={`zl-radio-sidebar${menuOpen ? " is-open" : ""}`}
+        style={{ width: SB_W, flexShrink: 0, position: "fixed", left: 0, top: 0, bottom: 80, background: "#0f0f0f", borderRight: "1px solid rgba(255,255,255,0.08)", overflowY: "auto", zIndex: 50, display: "flex", flexDirection: "column", padding: "20px 8px 16px" }}>
 
-        {/* Brand */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px 22px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 6px 20px" }}>
           <Brand height={20} />
-          <span style={{
-            fontSize: "0.62rem", fontWeight: 700, textTransform: "uppercase",
-            letterSpacing: "0.1em", color: "var(--brand)",
-            background: "rgba(149,249,8,0.12)", border: "1px solid rgba(149,249,8,0.3)",
-            borderRadius: 4, padding: "2px 7px",
-          }}>Radio</span>
+          <span style={{ fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--brand)", background: "rgba(149,249,8,0.1)", border: "1px solid rgba(149,249,8,0.28)", borderRadius: 4, padding: "2px 7px" }}>Radio</span>
         </div>
 
-        {/* Nav */}
-        <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <SbLink href="/radio" icon={<HomeI />} label="Inicio" active />
-          <SbLink href="#stations" icon={<WaveI />} label="Estaciones" onClick={() => setMenu(false)} />
-          <SbLink href="#moods" icon={<MoodI />} label="Estados de ánimo" onClick={() => setMenu(false)} />
-        </nav>
+        <SbItem icon={<HomeI />}   label="Inicio"        active href="/radio" onClick={() => setMenu(false)} />
+        <SbItem icon={<SearchI />} label="Buscar"               href="#" />
+        <SbItem icon={<LibI />}    label="Tu biblioteca"         href="#" />
 
-        <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "14px 8px" }} />
+        <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "8px 4px" }} />
+        <SbItem icon={<FavI />}    label="Favoritos"             href="#" />
+        <SbItem icon={<RecentI />} label="Escuchado"             href="#" />
 
-        {/* Recientes */}
+        <SbSection label="Explora" />
+        <SbItem icon={<WaveI />}  label="Estaciones"     href="#stations" indent onClick={() => setMenu(false)} />
+        <SbItem icon={<TrendI />} label="Top en Radio"   href="#trending" indent onClick={() => setMenu(false)} />
+        <SbItem icon={<NewI />}   label="Nuevos sonidos" href="#new"      indent onClick={() => setMenu(false)} />
+
+        <SbSection label="Estados de ánimo" />
+        {moods.slice(0, 6).map(m => (
+          <SbItem key={m.slug} label={m.name} href="#moods" indent onClick={() => { playMood(m.name); setMenu(false); }} />
+        ))}
+
         {recent.length > 0 && (
-          <div style={{ flex: "0 0 auto" }}>
-            <p style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(255,255,255,0.35)", padding: "0 8px 10px" }}>
-              Recientes
-            </p>
-            {recent.map(t => (
-              <button key={t.id} onClick={() => { toggle(t); setMenu(false); }} aria-label={`Reproducir ${t.title}`}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 8px", borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", width: "100%" }}>
-                <div style={{ width: 36, height: 36, borderRadius: 4, overflow: "hidden", flexShrink: 0 }}>
-                  <Cover variant={t.cover} image={t.coverImage} />
+          <>
+            <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "10px 4px" }} />
+            <SbSection label="Recientes" />
+            {recent.slice(0, 5).map(t => (
+              <button key={t.id} onClick={() => { toggle(t); setMenu(false); }}
+                style={{ display: "flex", alignItems: "center", gap: 9, padding: "5px 8px", borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", width: "100%" }}>
+                <div style={{ width: 32, height: 32, borderRadius: 4, overflow: "hidden", flexShrink: 0 }}>
+                  {t.coverImage
+                    ? <img src={t.coverImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : <div style={{ width: "100%", height: "100%", background: CINEMA[t.cover] }} />
+                  }
                 </div>
                 <div style={{ minWidth: 0, flex: 1, textAlign: "left" }}>
-                  <div style={{ fontSize: "0.79rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: playingId === t.id ? "var(--brand)" : "#fff" }}>{t.title}</div>
-                  <div style={{ fontSize: "0.69rem", color: "rgba(255,255,255,0.42)" }}>{t.artist}</div>
+                  <div style={{ fontSize: "0.76rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: playingId === t.id ? "var(--brand)" : "#fff" }}>{t.title}</div>
+                  <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.36)" }}>{t.artist}</div>
                 </div>
               </button>
             ))}
-          </div>
+          </>
         )}
 
-        {/* Bottom links */}
         <div style={{ marginTop: "auto" }}>
-          <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "14px 8px" }} />
-          <a href="/" style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", color: "rgba(255,255,255,0.45)", textDecoration: "none", fontSize: "0.82rem", fontWeight: 600, borderRadius: 8 }}>
-            <svg viewBox="0 0 24 24" width={14} height={14} fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-            Volver a Zoundlist
-          </a>
-          {user && (
-            <a href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", color: "rgba(255,255,255,0.45)", textDecoration: "none", fontSize: "0.82rem", fontWeight: 600, borderRadius: 8, marginTop: 2 }}>
-              Mi panel
-            </a>
-          )}
+          <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "12px 4px" }} />
+          <div style={{ background: "rgba(149,249,8,0.05)", border: "1px solid rgba(149,249,8,0.18)", borderRadius: 10, padding: "14px 12px", margin: "0 0 10px" }}>
+            <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#fff", marginBottom: 3 }}>¿Buscas música para tus proyectos?</p>
+            <p style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.48)", marginBottom: 12, lineHeight: 1.45 }}>Explora el catálogo completo en Zoundlist.</p>
+            <a href="/" style={{ display: "block", textAlign: "center", padding: "8px 0", background: "var(--brand)", color: "var(--brand-ink)", borderRadius: 6, textDecoration: "none", fontSize: "0.76rem", fontWeight: 700 }}>Explorar catálogo</a>
+          </div>
+          {user && <SbItem label="Mi panel" href="/dashboard" />}
         </div>
       </aside>
 
-      {/* ── Mobile hamburger ─────────────────────────────────────────────────── */}
-      <button onClick={() => setMenu(v => !v)} aria-label="Menú"
-        className="zl-radio-hamburger"
-        style={{ display: "none" }}
-      >
+      {/* Mobile hamburger */}
+      <button onClick={() => setMenu(v => !v)} aria-label="Menú" className="zl-radio-hamburger" style={{ display: "none" }}>
         <span /><span /><span />
       </button>
-      {menuOpen && <div onClick={() => setMenu(false)} aria-hidden="true" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 48 }} />}
+      {menuOpen && <div onClick={() => setMenu(false)} aria-hidden="true" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", zIndex: 48, backdropFilter: "blur(4px)" }} />}
 
       {/* ── MAIN ─────────────────────────────────────────────────────────────── */}
-      <main className="zl-radio-main" style={{ flex: 1, marginLeft: SB_W, paddingBottom: 100, overflowX: "hidden" }}>
+      <main className="zl-radio-main" style={{ flex: 1, marginLeft: SB_W, paddingBottom: 100, overflowX: "hidden", minWidth: 0 }}>
 
-        {/* Greeting + Quick Play */}
-        <section style={{ padding: `52px ${PAD}px 36px` }}>
-          <h1 style={{ fontSize: "clamp(1.8rem, 3vw, 2.6rem)", fontWeight: 700, letterSpacing: "-0.03em", color: "#fff", marginBottom: 22 }}>
-            {greeting || "Bienvenido"}
+        {/* HERO ─────────────────────────────────────────────────────────────── */}
+        <section style={{ padding: `48px ${PAD}px 44px` }}>
+          <h1 style={{ fontSize: "clamp(2.2rem, 4vw, 3.2rem)", fontWeight: 700, letterSpacing: "-0.04em", lineHeight: 1.05, marginBottom: 8 }}>
+            <span style={{ color: "#fff" }}>{greetPrefix}</span>
+            <span style={{ color: "var(--brand)" }}>{greetAccent || "–"}</span>
           </h1>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: 8 }}>
-            {quickItems.map(t => (
-              <QuickItem key={t.id} track={t} active={playingId === t.id} playing={player.isPlaying} onPlay={() => toggle(t, quickItems)} />
+          <p style={{ fontSize: "0.94rem", color: "rgba(255,255,255,0.42)", marginBottom: 28 }}>Dale play y déjate llevar.</p>
+
+          {/* Mood filter pills */}
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", marginBottom: 28 }}>
+            {MOOD_FILTERS.map(f => (
+              <button key={f.label} onClick={() => setFilter(f)}
+                style={{ flexShrink: 0, padding: "8px 18px", borderRadius: 20, border: moodFilter.label === f.label ? "none" : "1px solid rgba(255,255,255,0.12)", background: moodFilter.label === f.label ? "var(--brand)" : "rgba(255,255,255,0.06)", color: moodFilter.label === f.label ? "var(--brand-ink)" : "#fff", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}>
+                {f.label}
+              </button>
             ))}
           </div>
+
+          {/* Hero grid: NOW PLAYING + 4 shortcuts */}
+          {heroTrack && (
+            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, height: 340 }} className="zl-radio-hero-grid">
+              <NowPlayingCard track={heroTrack} isPlaying={player.isPlaying && playingId === heroTrack.id} onToggle={() => toggle(heroTrack)} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 10 }}>
+                <ShortcutCard title="Mix del día" subtitle="Hecho para ti" src={shortcutBgs.mix} variant="lime" href="#stations" />
+                <ShortcutCard title="Lo que está sonando" subtitle="Top 50" src={shortcutBgs.trend} variant="violet" href="#trending" />
+                <ShortcutCard title="Nuevos sonidos" subtitle="Estrenos de la semana" src={shortcutBgs.fresh} variant="teal" href="#new" />
+                <ShortcutCard title="Descubrimientos" subtitle="Artistas que quizás no conoces" src={shortcutBgs.disc} variant="gold" href="#artists" />
+              </div>
+            </div>
+          )}
         </section>
+
+        {/* Sigue escuchando */}
+        {recent.length > 0 && (
+          <section style={{ padding: `0 ${PAD}px 48px` }}>
+            <SecHead title="Sigue escuchando" />
+            <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8, scrollbarWidth: "none" }}>
+              {recent.map(t => <ContinueCard key={t.id} track={t} active={playingId === t.id} playing={player.isPlaying} onPlay={() => toggle(t, recent)} />)}
+            </div>
+          </section>
+        )}
 
         {/* Mix del día */}
         <section id="stations" style={{ padding: `0 ${PAD}px 48px` }}>
-          <SecH title="Mix del día" />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }} className="zl-radio-mix-grid">
-            {EDITORIAL_PLAYLISTS.map(pl => (
-              <MixCard key={pl.id} playlist={pl} trackCount={tracksForStation(tracks, pl).length} active={isStationActive(pl)} playing={player.isPlaying} onPlay={() => playStation(pl)} />
+          <SecHead title="Mix del día para ti" subtitle={greetAccent ? `Hecho para tu ${greetAccent}` : "Curado para este momento"} />
+          <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 8, scrollbarWidth: "none" }}>
+            {visiblePlaylists.map(pl => (
+              <StationCard key={pl.id} playlist={pl} coverSrc={stationCoverSrc(tracks, pl)} trackCount={tracksForStation(tracks, pl).length} active={isStationActive(pl)} playing={player.isPlaying} onPlay={() => playStation(pl)} />
             ))}
           </div>
         </section>
 
         {/* Lo que está sonando */}
         {trending.length > 0 && (
-          <section style={{ padding: `0 ${PAD}px 48px` }}>
-            <SecH title="Lo que está sonando" />
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {trending.slice(0, 10).map((t, i) => (
-                <TrendRow key={t.id} track={t} rank={i + 1} active={playingId === t.id} playing={player.isPlaying} onPlay={() => toggle(t, trending)} />
-              ))}
+          <section id="trending" style={{ padding: `0 ${PAD}px 48px` }}>
+            <SecHead title="Lo que está sonando" subtitle="Las más escuchadas en Radio" />
+            <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8, scrollbarWidth: "none" }}>
+              {trending.slice(0, 10).map((t, i) => <TrendCard key={t.id} track={t} rank={i + 1} active={playingId === t.id} playing={player.isPlaying} onPlay={() => toggle(t, trending)} />)}
             </div>
           </section>
         )}
 
         {/* Nuevos sonidos */}
         {newTracks.length > 0 && (
-          <section style={{ padding: `0 ${PAD}px 48px` }}>
-            <SecH title="Nuevos sonidos" />
-            <div style={{ display: "flex", gap: 20, overflowX: "auto", paddingBottom: 12, scrollbarWidth: "none" }}>
-              {newTracks.map(t => (
-                <SmallCard key={t.id} track={t} active={playingId === t.id} playing={player.isPlaying} onPlay={() => toggle(t, newTracks)} />
-              ))}
+          <section id="new" style={{ padding: `0 ${PAD}px 48px` }}>
+            <SecHead title="Nuevos sonidos" subtitle="Estrenos de esta semana" />
+            <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 8, scrollbarWidth: "none" }}>
+              {newTracks.map(t => <NewCard key={t.id} track={t} active={playingId === t.id} playing={player.isPlaying} onPlay={() => toggle(t, newTracks)} />)}
             </div>
           </section>
         )}
 
-        {/* Estados de ánimo */}
+        {/* ¿Qué quieres sentir? */}
         {moods.length > 0 && (
           <section id="moods" style={{ padding: `0 ${PAD}px 48px` }}>
-            <SecH title="¿Qué quieres sentir?" />
+            <SecHead title="¿Qué quieres sentir?" />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }} className="zl-radio-mood-grid">
               {moods.map(m => {
-                const hasTracks = tracks.some(t => t.mood.toLowerCase().includes(m.name.toLowerCase().split(" ")[0]) && !!t.audioUrl);
-                return <MoodTile key={m.slug} mood={m} onPlay={() => playMood(m.name)} disabled={!hasTracks} />;
+                const has = tracks.some(t => t.mood.toLowerCase().includes(m.name.toLowerCase().split(" ")[0]) && !!t.audioUrl);
+                return <MoodTile key={m.slug} mood={m} onPlay={() => playMood(m.name)} hasContent={has} />;
               })}
             </div>
           </section>
@@ -480,18 +539,17 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
 
         {/* Artistas */}
         {artists.length > 0 && (
-          <section style={{ padding: `0 ${PAD}px 48px` }}>
-            <SecH title="Artistas que debes escuchar" />
-            <div style={{ display: "flex", gap: 24, overflowX: "auto", paddingBottom: 12, scrollbarWidth: "none" }}>
+          <section id="artists" style={{ padding: `0 ${PAD}px 48px` }}>
+            <SecHead title="Artistas que debes escuchar" />
+            <div style={{ display: "flex", gap: 22, overflowX: "auto", paddingBottom: 12, scrollbarWidth: "none" }}>
               {artists.map(a => (
-                <ArtistCard key={a.name} name={a.name} trackCount={a.trackCount} variant={a.variant}
+                <ArtistCircle key={a.name} name={a.name} trackCount={a.trackCount} variant={a.variant}
                   onPlay={() => { const q = tracks.filter(t => t.artist === a.name).map(toPlayerTrack).filter((x): x is PlayerTrack => x !== null); if (q.length) player.playTrack(q[0], q); }} />
               ))}
             </div>
           </section>
         )}
 
-        {/* Originals */}
         {ORIGINALS_CONFIG.enabled && (
           <section style={{ padding: `0 ${PAD}px 48px` }}>
             <div className="zl-originals">
@@ -502,42 +560,32 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
           </section>
         )}
 
-        {/* Footer */}
-        <div style={{ padding: `24px ${PAD}px`, display: "flex", gap: 24, alignItems: "center", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-          <p style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)" }}>© 2026 Zoundlist · JM Creativos LLC</p>
-          <a href="/privacidad" style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.35)", textDecoration: "none" }}>Privacidad</a>
+        <div style={{ padding: `22px ${PAD}px`, display: "flex", gap: 22, alignItems: "center", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+          <p style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.24)" }}>© 2026 Zoundlist · JM Creativos LLC</p>
+          <a href="/privacidad" style={{ fontSize: "0.74rem", color: "rgba(255,255,255,0.24)", textDecoration: "none" }}>Privacidad</a>
         </div>
       </main>
 
-      {/* Responsive + hover overrides */}
       <style>{`
         .zl-radio-hamburger { display: none; }
-        button:hover .qitem-play { opacity: 1 !important; }
+        @keyframes rp-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.45;transform:scale(.8)} }
+        .rp-dot { animation: rp-pulse 2s ease-in-out infinite; }
 
-        @media (max-width: 900px) {
-          .zl-radio-sidebar {
-            transform: translateX(-100%) !important;
-            transition: transform 0.28s ease;
-          }
-          .zl-radio-sidebar.is-open {
-            transform: translateX(0) !important;
-            z-index: 200;
-          }
-          .zl-radio-main { margin-left: 0 !important; padding-top: 60px; }
-          .zl-radio-hamburger {
-            display: flex !important;
-            position: fixed; top: 16px; left: 16px; z-index: 100;
-            flex-direction: column; gap: 5px;
-            background: rgba(13,13,13,0.92); border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 8px; padding: 10px; cursor: pointer;
-          }
-          .zl-radio-hamburger span { display: block; width: 20px; height: 2px; background: #fff; border-radius: 2px; }
-          .zl-radio-mix-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .zl-radio-mood-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        @media (max-width: 1024px) {
+          .zl-radio-hero-grid { grid-template-columns: 1fr !important; height: auto !important; }
+          .zl-radio-hero-grid > div:last-child { height: 180px; }
         }
-        @media (max-width: 560px) {
-          .zl-radio-mix-grid { grid-template-columns: 1fr !important; }
-          .zl-radio-mood-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        @media (max-width: 900px) {
+          .zl-radio-sidebar { transform: translateX(-100%) !important; transition: transform .28s cubic-bezier(.22,1,.36,1); }
+          .zl-radio-sidebar.is-open { transform: translateX(0) !important; z-index: 200; }
+          .zl-radio-main { margin-left: 0 !important; padding-top: 60px; }
+          .zl-radio-hamburger { display: flex !important; flex-direction: column; gap: 5px; position: fixed; top: 16px; left: 16px; z-index: 100; background: rgba(15,15,15,.96); border: 1px solid rgba(255,255,255,.1); border-radius: 8px; padding: 10px; cursor: pointer; }
+          .zl-radio-hamburger span { display: block; width: 20px; height: 2px; background: #fff; border-radius: 2px; }
+          .zl-radio-mood-grid { grid-template-columns: repeat(2,1fr) !important; }
+        }
+        @media (max-width: 600px) {
+          .zl-radio-mood-grid { grid-template-columns: 1fr !important; }
+          .zl-radio-hero-grid > div:last-child { height: 140px; }
         }
       `}</style>
     </div>
