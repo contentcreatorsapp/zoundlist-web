@@ -162,9 +162,23 @@ export function PlayerBar() {
     const url = p.track.albumId
       ? `${window.location.origin}/catalog/${p.track.albumId}`
       : window.location.href;
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: p.track.title,
+          text:  `Escucha "${p.track.title}" de ${p.track.artist} en Zoundlist`,
+          url,
+        });
+      } catch {
+        // usuario canceló — no hacer nada
+      }
+    } else {
+      // Fallback: copiar al portapapeles
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleDownload = async () => {
