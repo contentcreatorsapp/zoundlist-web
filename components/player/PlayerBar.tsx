@@ -274,14 +274,14 @@ export function PlayerBar() {
                     : COVERS[p.track.cover],
                   position: "relative", overflow: "hidden",
                 }}>
-                  {p.isLoading && (
+                  {(p.isLoading || p.hasError) && (
                     <div style={{
                       position: "absolute", inset: 0,
-                      background: "rgba(0,0,0,0.5)",
+                      background: "rgba(0,0,0,0.55)",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "0.7rem",
+                      fontSize: "0.75rem",
                     }}>
-                      ⏳
+                      {p.hasError ? "!" : "…"}
                     </div>
                   )}
                 </div>
@@ -289,8 +289,8 @@ export function PlayerBar() {
                   <p style={{ fontWeight: 600, fontSize: "0.85rem", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)" }}>
                     {p.track.title}
                   </p>
-                  <p style={{ fontSize: "0.74rem", color: "var(--text-3)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {p.track.artist}
+                  <p style={{ fontSize: "0.74rem", color: p.hasError ? "var(--orange)" : "var(--text-3)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {p.hasError ? "Error al cargar — saltando…" : p.track.artist}
                   </p>
                 </div>
               </>

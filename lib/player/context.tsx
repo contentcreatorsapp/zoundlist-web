@@ -69,7 +69,7 @@ function applyMediaSession(track: PlayerTrack) {
 // ── Default state ─────────────────────────────────────────────────────────────
 const DEFAULTS: PlayerState = {
   track: null, queue: [], queueIndex: -1,
-  isPlaying: false, isLoading: false,
+  isPlaying: false, isLoading: false, hasError: false,
   currentTime: 0, duration: 0,
   volume: 0.8, muted: false,
   shuffle: false, shuffledIndices: [],
@@ -101,8 +101,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const muted    = saved.muted     ?? false;
     const shuffle  = saved.shuffle   ?? false;
     const repeat   = (saved.repeat   ?? "none") as RepeatMode;
-    const track    = saved.track     ?? null;
-    const queue    = saved.queue     ?? [];
+    // Discard persisted tracks without a valid audioUrl (stale seed data etc.)
+    const track    = saved.track?.audioUrl ? saved.track as PlayerTrack : null;
+    const queue    = (saved.queue ?? []).filter(t => !!t.audioUrl) as PlayerTrack[];
     const queueIndex = saved.queueIndex ?? -1;
     const currentTime = saved.currentTime ?? 0;
 
@@ -134,7 +135,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setState(s => ({ ...s, currentTime: t }));
       savePlayer({ currentTime: t });
     };
-    const onError = () => setState(s => ({ ...s, isLoading: false, isPlaying: false }));
+    const onError = () => {
+      setState(s => ({ ...s, isLoading: false, isPlaying: false, hasError: true }));
+      // Auto-advance to the next track after 1.5 s (unless repeat-one)
+      const s = stateRef.current;
+      if (s.repeat !== "one") {
+        const ni = nextIndex(s);
+        if (ni !== -1) {
+          setTimeout(() => loadAndPlay(stateRef.current.queue[ni], ni), 1500);
+        }
+      }
+    };
     const onEnded = () => {
       const s = stateRef.current;
       if (s.repeat === "one") {
@@ -187,24 +198,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // ── Core load+play ────────────────────────────────────────────────────────
   const loadAndPlay = useCallback((track: PlayerTrack, idx: number) => {
-    const audio = getAudio();
+    // Validate — guard against empty strings that slip through
+    if (!track.audioUrl || !track.audioUrl.trim()) return;
 
-    // Always update UI state so the PlayerBar appears
+    const audio = getAudio();
+    audio.src = track.audioUrl;
+    audio.load();
+
     setState(s => ({
       ...s, track, queueIndex: idx,
-      isLoading: !!track.audioUrl,
-      isPlaying: false, currentTime: 0, duration: 0,
+      isLoading: true, isPlaying: false,
+      currentTime: 0, duration: 0, hasError: false,
     }));
     applyMediaSession(track);
     savePlayer({ track, queueIndex: idx });
 
-    if (!track.audioUrl) return; // no audio file — show bar but don't play
-
-    audio.src = track.audioUrl;
-    audio.load();
     audio.play()
       .then(() => setState(s => ({ ...s, isPlaying: true })))
-      .catch(() => setState(s => ({ ...s, isLoading: false })));
+      .catch(() => setState(s => ({ ...s, isLoading: false, hasError: true })));
   }, []);
 
   // ── Public API ────────────────────────────────────────────────────────────

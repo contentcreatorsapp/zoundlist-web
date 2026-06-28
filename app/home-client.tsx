@@ -118,7 +118,8 @@ function Cover({ variant, glyph, radius, image }: { variant: CoverVariant; glyph
   );
 }
 
-function ReleasePlay({ on, playing, size = 18 }: { on: boolean; playing: boolean; size?: number }) {
+function ReleasePlay({ on, playing, hasAudio = true, size = 18 }: { on: boolean; playing: boolean; hasAudio?: boolean; size?: number }) {
+  if (!hasAudio) return null;
   return (
     <span className="zl-release__play" style={on ? { opacity: 1, transform: "translateY(0) scale(1)" } : undefined}>
       {on && playing ? <Pause size={size} /> : <Play size={size} />}
@@ -173,18 +174,22 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
   // Global audio player
   const player = usePlayer();
 
-  // Map a catalog Track → PlayerTrack
-  const toPlayerTrack = (t: typeof tracks[0]): PlayerTrack =>
-    ({ id: t.id, title: t.title, artist: t.artist, audioUrl: t.audioUrl,
-       cover: t.cover, coverImage: t.coverImage ?? null, duration: t.duration });
-  const allPlayerTracks = tracks.map(toPlayerTrack);
+  // Map a catalog Track → PlayerTrack — only tracks with a real audioUrl
+  const toPlayerTrack = (t: typeof tracks[0]): PlayerTrack | null =>
+    t.audioUrl
+      ? { id: t.id, title: t.title, artist: t.artist, audioUrl: t.audioUrl,
+          cover: t.cover, coverImage: t.coverImage ?? null, duration: t.duration }
+      : null;
+  const audioTracks = tracks.map(toPlayerTrack).filter((t): t is PlayerTrack => t !== null);
 
   // Compatibility shims matching the old usePlayer API shape
   const playingId = player.track?.id ?? null;
   const progress  = player.duration > 0 ? player.currentTime / player.duration : 0;
   const toggle = (t: typeof tracks[0]) => {
+    const pt = toPlayerTrack(t);
+    if (!pt) return;                                    // no audio — silent no-op
     if (playingId === t.id) { player.togglePlay(); return; }
-    player.playTrack(toPlayerTrack(t), allPlayerTracks);
+    player.playTrack(pt, audioTracks);
   };
 
   const playingTrack = tracks.find((t) => t.id === playingId);
@@ -471,7 +476,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
             {featured.map((t) => (
               <button key={t.id} className="zl-release" onClick={() => toggle(t)} aria-label={`Reproducir ${t.title}`}>
                 <Cover variant={t.cover} glyph={t.glyph} image={t.coverImage} />
-                <ReleasePlay on={playingId === t.id} playing={player.isPlaying} />
+                <ReleasePlay on={playingId === t.id} playing={player.isPlaying} hasAudio={!!t.audioUrl} />
                 <div className="zl-release__title">{t.title}</div>
                 <div className="zl-release__meta">{t.artist} · {t.mood}</div>
               </button>
@@ -488,7 +493,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
             {trending.map((t, i) => {
               const on = playingId === t.id;
               return (
-                <button key={t.id} className={`zl-track${on ? " is-playing" : ""}`} onClick={() => toggle(t)} aria-label={`Reproducir ${t.title}`}>
+                <button key={t.id} className={`zl-track${on ? " is-playing" : ""}`} onClick={() => toggle(t)} aria-label={`Reproducir ${t.title}`} style={!t.audioUrl ? { opacity: 0.4, cursor: "default" } : undefined}>
                   <span className="zl-track__rank">{on ? (player.isPlaying ? <Pause size={13} /> : <Play size={13} />) : i + 1}</span>
                   <span className="zl-track__cover"><Cover variant={t.cover} glyph={t.glyph} radius={10} image={t.coverImage} /></span>
                   <span style={{ minWidth: 0 }}>
@@ -543,7 +548,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
                 {staffList.map((t, i) => {
                   const on = playingId === t.id;
                   return (
-                    <button key={t.id} className={`zl-track${on ? " is-playing" : ""}`} onClick={() => toggle(t)} style={{ gridTemplateColumns: "26px 46px 1fr auto" }} aria-label={`Reproducir ${t.title}`}>
+                    <button key={t.id} className={`zl-track${on ? " is-playing" : ""}`} onClick={() => toggle(t)} style={{ gridTemplateColumns: "26px 46px 1fr auto", ...(!t.audioUrl ? { opacity: 0.4, cursor: "default" } : {}) }} aria-label={`Reproducir ${t.title}`}>
                       <span className="zl-track__rank">{on ? (player.isPlaying ? <Pause size={12} /> : <Play size={12} />) : i + 1}</span>
                       <span style={{ width: 46, height: 46 }}><Cover variant={t.cover} glyph={t.glyph} radius={9} image={t.coverImage} /></span>
                       <span style={{ minWidth: 0 }}>
@@ -571,7 +576,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
                 <div style={{ position: "relative" }}>
                   <Cover variant={t.cover} glyph={t.glyph} image={t.coverImage} />
                   <span className="zl-pill-new" style={{ position: "absolute", top: 12, left: 12 }}>Nuevo</span>
-                  <ReleasePlay on={playingId === t.id} playing={player.isPlaying} />
+                  <ReleasePlay on={playingId === t.id} playing={player.isPlaying} hasAudio={!!t.audioUrl} />
                 </div>
                 <div className="zl-release__title">{t.title}</div>
                 <div className="zl-release__meta">{t.artist} · {t.duration}</div>
@@ -647,7 +652,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
             {filtered.map((t) => (
               <button key={t.id} className="zl-release" onClick={() => toggle(t)} aria-label={`Reproducir ${t.title}`}>
                 <Cover variant={t.cover} glyph={t.glyph} image={t.coverImage} />
-                <ReleasePlay on={playingId === t.id} playing={player.isPlaying} />
+                <ReleasePlay on={playingId === t.id} playing={player.isPlaying} hasAudio={!!t.audioUrl} />
                 <div className="zl-release__title">{t.title}</div>
                 <div className="zl-release__meta">{t.artist} · {t.bpm} BPM · {t.duration}</div>
                 <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>

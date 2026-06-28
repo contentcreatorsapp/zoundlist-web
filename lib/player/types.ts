@@ -7,7 +7,7 @@ export interface PlayerTrack {
   id: string;
   title: string;
   artist: string;
-  audioUrl: string | null;  // null = no file yet; shows bar but no audio plays
+  audioUrl: string;         // required — callers must only create PlayerTrack when URL exists
   cover: CoverVariant;
   coverImage: string | null;
   duration: string;         // formatted "3:45"
@@ -20,6 +20,7 @@ export interface PlayerState {
   queueIndex: number;
   isPlaying: boolean;
   isLoading: boolean;
+  hasError: boolean;
   currentTime: number;
   duration: number;
   volume: number;           // 0–1
