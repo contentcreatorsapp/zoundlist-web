@@ -4,7 +4,7 @@ import { getAlbumWithTracks } from "@/services/albums";
 import { Brand } from "@/components/brand";
 import { ZipUpload } from "./zip-upload";
 import { AlbumTracksClient } from "./album-tracks-client";
-import { AlbumCoverGenerator } from "@/components/ai/AlbumCoverGenerator";
+import { CoverPicker } from "@/components/covers/CoverPicker";
 
 export const dynamic = "force-dynamic";
 
@@ -32,11 +32,10 @@ export default async function AlbumDetailPage({ params }: { params: Promise<{ al
 
         {/* Album header */}
         <div style={{ display: "flex", gap: 24, alignItems: "flex-start", marginBottom: 32, flexWrap: "wrap" }}>
-          <AlbumCoverGenerator
+          <CoverPicker
             albumId={album.id}
-            cover={album.cover}
+            genreSlug={album.genreSlug ?? "cinematic"}
             coverImage={album.coverImage}
-            glyph={album.glyph}
           />
           <div style={{ flex: 1, minWidth: 200 }}>
             <span className="zl-eyebrow" style={{ marginBottom: 6, display: "block" }}>Álbum</span>
