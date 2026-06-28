@@ -46,8 +46,8 @@ async function buildImagePrompt(
   return data.content?.[0]?.text?.trim() ?? `Professional album cover for "${title}", ${genre} music, dark aesthetic`;
 }
 
-// ── Step 2: DALL-E 3 generates the image ──────────────────────────────────────
-async function generateImage(prompt: string): Promise<string> {
+// ── Step 2: gpt-image-1 generates the image ───────────────────────────────────
+async function generateImage(prompt: string): Promise<Buffer> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured.");
 
@@ -58,30 +58,26 @@ async function generateImage(prompt: string): Promise<string> {
       "content-type":  "application/json",
     },
     body: JSON.stringify({
-      model:   "dall-e-3",
+      model:   "gpt-image-1",
       prompt,
       n:       1,
       size:    "1024x1024",
-      quality: "standard",
+      quality: "medium",
     }),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(`DALL-E 3 error: ${err?.error?.message ?? res.status}`);
+    throw new Error(`Image generation error: ${err?.error?.message ?? res.status}`);
   }
   const data = await res.json();
-  const url  = data.data?.[0]?.url;
-  if (!url) throw new Error("No image URL in DALL-E response");
-  return url;
+  const b64  = data.data?.[0]?.b64_json;
+  if (!b64) throw new Error("No image data in response");
+  return Buffer.from(b64, "base64");
 }
 
-// ── Step 3: Download + upload to Supabase Storage ─────────────────────────────
-async function saveToStorage(imageUrl: string, albumId: string): Promise<string> {
-  const imgRes = await fetch(imageUrl);
-  if (!imgRes.ok) throw new Error("Could not download generated image");
-
-  const buffer      = Buffer.from(await imgRes.arrayBuffer());
+// ── Step 3: Upload buffer to Supabase Storage ─────────────────────────────────
+async function saveToStorage(buffer: Buffer, albumId: string): Promise<string> {
   const storagePath = `albums/${albumId}/ai-cover-${Date.now()}.jpg`;
 
   const admin = createAdminClient();
@@ -132,11 +128,11 @@ export async function POST(req: NextRequest) {
       album.title, album.artist ?? "Unknown", album.genre_slug ?? "music", album.mood ?? null
     );
 
-    // 2. Generate image with DALL-E 3
-    const tempUrl = await generateImage(prompt);
+    // 2. Generate image
+    const imageBuffer = await generateImage(prompt);
 
     // 3. Save to Supabase Storage
-    const coverUrl = await saveToStorage(tempUrl, albumId);
+    const coverUrl = await saveToStorage(imageBuffer, albumId);
 
     // 4. Update album record
     const admin = createAdminClient();
