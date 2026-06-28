@@ -5,6 +5,7 @@ import { Brand } from "@/components/brand";
 import { ZipUpload } from "./zip-upload";
 import { AlbumTracksClient } from "./album-tracks-client";
 import { CoverPicker } from "@/components/covers/CoverPicker";
+import { AlbumActions } from "@/components/dashboard/AlbumActions";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,9 @@ export default async function AlbumDetailPage({ params }: { params: Promise<{ al
           mood={album.mood ?? "Épico"}
           cover={album.cover}
         />
+
+        {/* Album actions */}
+        <AlbumActions albumId={album.id} title={album.title} published={album.published} />
 
         {/* Track list */}
         <div style={{ marginTop: 36 }}>
