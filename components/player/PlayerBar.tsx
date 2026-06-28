@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { usePlayer } from "@/lib/player/context";
 import { COVERS } from "@/lib/catalog/covers";
 
@@ -139,6 +140,8 @@ function QueuePanel() {
 // ── PlayerBar ─────────────────────────────────────────────────────────────────
 export function PlayerBar() {
   const p = usePlayer();
+  const pathname = usePathname();
+  const isRadio = pathname?.startsWith("/radio") ?? false;
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
   const [liked, setLiked]         = useState(false);
@@ -272,7 +275,7 @@ export function PlayerBar() {
 
           {/* Right: download + volume + queue */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
-            {p.track && (
+            {p.track && !isRadio && (
               <button onClick={handleDownload} title="Descargar" style={{
                 display: "flex", alignItems: "center", gap: 4, background: "transparent",
                 border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer",
