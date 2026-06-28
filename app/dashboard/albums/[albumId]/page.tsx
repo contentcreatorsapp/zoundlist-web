@@ -1,10 +1,10 @@
 import { redirect, notFound } from "next/navigation";
 import { getMyProfile, canUpload } from "@/services/profile";
 import { getAlbumWithTracks } from "@/services/albums";
-import { COVERS } from "@/lib/catalog/covers";
 import { Brand } from "@/components/brand";
 import { ZipUpload } from "./zip-upload";
 import { AlbumTracksClient } from "./album-tracks-client";
+import { AlbumCoverGenerator } from "@/components/ai/AlbumCoverGenerator";
 
 export const dynamic = "force-dynamic";
 
@@ -32,13 +32,12 @@ export default async function AlbumDetailPage({ params }: { params: Promise<{ al
 
         {/* Album header */}
         <div style={{ display: "flex", gap: 24, alignItems: "flex-start", marginBottom: 32, flexWrap: "wrap" }}>
-          <div style={{
-            width: 120, height: 120, borderRadius: 16, flexShrink: 0, overflow: "hidden",
-            background: album.coverImage ? `url(${album.coverImage}) center/cover no-repeat` : COVERS[album.cover],
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.5rem",
-          }}>
-            {!album.coverImage && album.glyph}
-          </div>
+          <AlbumCoverGenerator
+            albumId={album.id}
+            cover={album.cover}
+            coverImage={album.coverImage}
+            glyph={album.glyph}
+          />
           <div style={{ flex: 1, minWidth: 200 }}>
             <span className="zl-eyebrow" style={{ marginBottom: 6, display: "block" }}>Álbum</span>
             <h1 style={{ fontSize: "1.8rem", fontWeight: 800, margin: "0 0 6px" }}>{album.title}</h1>
