@@ -343,14 +343,15 @@ export function PlayerBar() {
           </div>
 
           {/* Right: volume + queue */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+          <div className="zl-player-right" style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
             <button
               onClick={p.toggleMute}
+              className="zl-player-volume-btn"
               style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.55)", flexShrink: 0, padding: 4 }}
             >
               <VolumeIcon muted={p.muted} volume={p.volume} />
             </button>
-            <div style={{ width: 88 }}>
+            <div className="zl-player-volume-slider" style={{ width: 88 }}>
               <Slider
                 value={p.muted ? 0 : p.volume}
                 max={1}
@@ -365,6 +366,14 @@ export function PlayerBar() {
           </div>
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 640px) {
+          .zl-player-volume-btn,
+          .zl-player-volume-slider { display: none !important; }
+          .zl-player-right { min-width: 36px; }
+        }
+      `}</style>
     </>
   );
 }
