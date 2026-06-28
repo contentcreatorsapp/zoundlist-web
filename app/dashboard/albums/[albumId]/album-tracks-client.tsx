@@ -5,6 +5,7 @@ import { usePlayer } from "@/lib/player/context";
 import type { PlayerTrack } from "@/lib/player/types";
 import { COVERS } from "@/lib/catalog/covers";
 import type { Album, AlbumTrack } from "@/services/albums";
+import { PublishingAssistant } from "@/components/ai/PublishingAssistant";
 
 function Play({ size = 14 }: { size?: number }) {
   return <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor"><path d="M8 5v14l11-7z" /></svg>;
@@ -57,7 +58,9 @@ export function AlbumTracksClient({ album, tracks }: Props) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div>
+      <PublishingAssistant albumId={album.id} tracks={tracks} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {tracks.map((track, i) => {
         const isCurrent = playingId === track.id;
         const isPlaying = isCurrent && player.isPlaying;
@@ -156,6 +159,7 @@ export function AlbumTracksClient({ album, tracks }: Props) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
