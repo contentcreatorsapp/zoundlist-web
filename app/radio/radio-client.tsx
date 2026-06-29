@@ -597,10 +597,21 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
         </div>
       </aside>
 
-      {/* Mobile hamburger */}
-      <button onClick={() => setMenu(v => !v)} aria-label="Menú" className="zl-radio-hamburger" style={{ display: isMobile ? "flex" : "none" }}>
-        <span /><span /><span />
-      </button>
+      {/* Mobile top bar */}
+      {isMobile && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 56, background: "rgba(13,13,13,0.96)", borderBottom: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(12px)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px" }}>
+          <button onClick={() => setMenu(v => !v)} aria-label="Menú" style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", gap: 5, padding: "6px 4px" }}>
+            <span style={{ display: "block", width: 20, height: 2, background: "#fff", borderRadius: 2 }} />
+            <span style={{ display: "block", width: 20, height: 2, background: "#fff", borderRadius: 2 }} />
+            <span style={{ display: "block", width: 20, height: 2, background: "#fff", borderRadius: 2 }} />
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Brand height={16} />
+            <span style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--brand)", background: "rgba(149,249,8,0.12)", border: "1px solid rgba(149,249,8,0.3)", borderRadius: 4, padding: "2px 7px" }}>Radio</span>
+          </div>
+          <div style={{ width: 32 }} />
+        </div>
+      )}
       {menuOpen && <div onClick={() => setMenu(false)} aria-hidden="true" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", zIndex: 48, backdropFilter: "blur(4px)" }} />}
 
       {/* ── MAIN ─────────────────────────────────────────────────────────────── */}
