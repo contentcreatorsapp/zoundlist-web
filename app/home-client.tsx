@@ -157,6 +157,7 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
   const [user, setUser] = useState<User | null>(null);
   const [activeFilter, setActiveFilter] = useState("all");
   const [heroIdx, setHeroIdx] = useState(0);
+  const [mobileMenu, setMobileMenu] = useState(false);
 
   // Global audio player
   const player = usePlayer();
@@ -360,9 +361,77 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
                 <button className="zl-btn zl-btn--primary zl-btn--sm" onClick={openSignup}>Empezar gratis</button>
               </>
             )}
+            {/* Hamburger — only on mobile */}
+            <button
+              onClick={() => setMobileMenu(v => !v)}
+              aria-label="Menú"
+              style={{ display: "none", flexDirection: "column", gap: 5, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "9px 10px", cursor: "pointer", marginLeft: 4 }}
+              className="zl-show-mobile-menu"
+            >
+              <span style={{ display: "block", width: 18, height: 2, background: "#fff", borderRadius: 2 }} />
+              <span style={{ display: "block", width: 18, height: 2, background: "#fff", borderRadius: 2 }} />
+              <span style={{ display: "block", width: 18, height: 2, background: "#fff", borderRadius: 2 }} />
+            </button>
           </div>
         </div>
       </nav>
+
+      {/* ── MOBILE MENU DRAWER ── */}
+      {mobileMenu && (
+        <div
+          onClick={() => setMobileMenu(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", zIndex: 998, backdropFilter: "blur(4px)" }}
+        />
+      )}
+      <div
+        style={{
+          position: "fixed", top: 0, right: 0, bottom: 0, width: 280,
+          background: "#111", borderLeft: "1px solid rgba(255,255,255,0.08)",
+          zIndex: 999, transform: mobileMenu ? "translateX(0)" : "translateX(100%)",
+          transition: "transform 0.28s cubic-bezier(.22,1,.36,1)",
+          display: "flex", flexDirection: "column", padding: "24px 20px",
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
+          <Brand height={20} />
+          <button onClick={() => setMobileMenu(false)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: "1.4rem", cursor: "pointer", lineHeight: 1 }}>✕</button>
+        </div>
+
+        {/* Radio — highlighted as the featured destination */}
+        <a href="/radio" onClick={() => setMobileMenu(false)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "rgba(149,249,8,0.08)", border: "1px solid rgba(149,249,8,0.2)", borderRadius: 10, textDecoration: "none", marginBottom: 8 }}>
+          <span style={{ fontSize: "1.1rem" }}>🎵</span>
+          <div>
+            <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--brand)" }}>Radio</div>
+            <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", marginTop: 2 }}>Descubre nueva música</div>
+          </div>
+        </a>
+
+        <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "12px 0" }} />
+
+        {[
+          { label: "Descubrir", href: "#featured" },
+          { label: "Géneros", href: "#genres" },
+          { label: "Licencias", href: "#license" },
+          { label: "Precios", href: "#pricing" },
+        ].map(({ label, href }) => (
+          <a key={label} href={href} onClick={() => setMobileMenu(false)}
+            style={{ display: "block", padding: "13px 8px", fontSize: "1rem", fontWeight: 500, color: "rgba(255,255,255,0.75)", textDecoration: "none", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+            {label}
+          </a>
+        ))}
+
+        <div style={{ marginTop: "auto", paddingTop: 24 }}>
+          {user ? (
+            <a href="/dashboard" className="zl-btn zl-btn--primary" style={{ display: "block", textAlign: "center", textDecoration: "none" }}>Mi panel</a>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button className="zl-btn zl-btn--primary" onClick={() => { setMobileMenu(false); openSignup(); }}>Empezar gratis</button>
+              <button className="zl-btn zl-btn--ghost" onClick={() => { setMobileMenu(false); openLogin(); }}>Iniciar sesión</button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* ── HERO ── */}
       <header className="zl-section" style={{ paddingTop: 152, paddingBottom: 72 }}>

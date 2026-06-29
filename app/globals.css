@@ -901,6 +901,7 @@ body::after {
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 980px) {
   .zl-hide-md { display: none !important; }
+  .zl-show-mobile-menu { display: flex !important; }
 }
 @media (max-width: 760px) {
   :root { --pad: 18px; }

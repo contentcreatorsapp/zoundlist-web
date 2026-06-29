@@ -5,10 +5,10 @@ import type { User } from "@supabase/supabase-js";
 import type { Catalog, Track, CoverVariant } from "@/types/catalog";
 import { Brand } from "@/components/brand";
 import { usePlayer } from "@/lib/player/context";
-import { loadPlayer } from "@/lib/player/storage";
 import type { PlayerTrack } from "@/lib/player/types";
 import { EDITORIAL_PLAYLISTS, ORIGINALS_CONFIG } from "@/lib/radio/playlists";
 import type { EditorialPlaylist } from "@/lib/radio/types";
+import { RADIO_STORIES } from "@/lib/radio/stories";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 // ── Cinematic gradients — feel like tinted photography, not blob mesh ─────────
@@ -23,12 +23,37 @@ const CINEMA: Record<CoverVariant, string> = {
   ember:   "linear-gradient(155deg, #190300 0%, #5c1100 45%, #2e0700 100%)",
 };
 
+// Friendly display names for catalog mood slugs in the Radio context.
+// Keeps technical mood names out of the UI while maintaining filter logic.
+const MOOD_DISPLAY: Record<string, string> = {
+  "Épico":         "Para manejar",
+  "Tranquilo":     "Para relajarte",
+  "Motivacional":  "Para trabajar",
+  "Melancólico":   "Noche",
+  "Energético":    "Para entrenar",
+  "Reverente":     "Domingo por la mañana",
+  "Romántico":     "Atardecer",
+  "Alegre":        "Café",
+  "Nostálgico":    "Road Trip",
+  "Concentrado":   "Para estudiar",
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function getGreetingParts(): [string, string] {
+function getGreeting(): { prefix: string; accent: string; subtitle: string } {
   const h = new Date().getHours();
-  if (h < 12) return ["Buenos ", "días"];
-  if (h < 18) return ["Buenas ", "tardes"];
-  return ["Buenas ", "noches"];
+  const subtitles: [number, string][] = [
+    [6,  "El mundo duerme. La música, no."],
+    [10, "El mejor comienzo es una buena canción."],
+    [13, "Hoy encontramos algo que creemos que te va a gustar."],
+    [16, "Sube el volumen. Acaba de llegar música nueva."],
+    [19, "Tu próxima canción favorita puede estar aquí."],
+    [22, "Esta noche empieza con una buena canción."],
+    [25, "Dale play y deja que la música haga el resto."],
+  ];
+  const subtitle = (subtitles.find(([limit]) => h < limit) ?? subtitles.at(-1))![1];
+  if (h < 12) return { prefix: "Buenos ", accent: "días", subtitle };
+  if (h < 18) return { prefix: "Buenas ", accent: "tardes", subtitle };
+  return { prefix: "Buenas ", accent: "noches", subtitle };
 }
 
 function toPlayerTrack(t: Track): PlayerTrack | null {
@@ -129,21 +154,47 @@ function SecHead({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
-// ── NOW PLAYING hero card ─────────────────────────────────────────────────────
-function NowPlayingCard({ track, isPlaying, onToggle }: { track: Track; isPlaying: boolean; onToggle: () => void }) {
+// ── NOW PLAYING hero card (with "A continuación") ─────────────────────────────
+function NowPlayingCard({ track, nextTracks, isPlaying, onToggle }: {
+  track: Track; nextTracks: Track[]; isPlaying: boolean; onToggle: () => void;
+}) {
   return (
     <PhotoCard src={track.coverImage} gradient={CINEMA[track.cover]} style={{ height: "100%", borderRadius: 14 }}>
       <div style={{ flex: 1 }} />
-      <div style={{ padding: "24px 24px 28px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+      <div style={{ padding: "22px 22px 24px" }}>
+        {/* EN RADIO AHORA badge */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <span className="rp-dot" style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--brand)", display: "block", flexShrink: 0 }} />
           <span style={{ fontSize: "0.62rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.14em", color: "rgba(255,255,255,0.72)" }}>En Radio Ahora</span>
         </div>
-        <h2 style={{ fontSize: "clamp(1.4rem, 2.5vw, 1.9rem)", fontWeight: 700, letterSpacing: "-0.025em", color: "#fff", marginBottom: 6, lineHeight: 1.15 }}>{track.title}</h2>
-        <p style={{ fontSize: "0.84rem", color: "rgba(255,255,255,0.52)", marginBottom: 24 }}>{track.artist} · {track.mood}</p>
-        <button onClick={onToggle} style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--brand)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand-ink)", boxShadow: "0 8px 32px rgba(149,249,8,0.4)" }}>
-          {isPlaying ? <PauseI s={22} /> : <PlayI s={22} />}
+        {/* Track info */}
+        <h2 style={{ fontSize: "clamp(1.3rem, 2vw, 1.75rem)", fontWeight: 700, letterSpacing: "-0.025em", color: "#fff", marginBottom: 5, lineHeight: 1.15 }}>{track.title}</h2>
+        <p style={{ fontSize: "0.84rem", color: "rgba(255,255,255,0.52)", marginBottom: 18 }}>{track.artist} · {track.mood}</p>
+        <button onClick={onToggle} style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--brand)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand-ink)", boxShadow: "0 8px 28px rgba(149,249,8,0.4)" }}>
+          {isPlaying ? <PauseI s={20} /> : <PlayI s={20} />}
         </button>
+
+        {/* A continuación */}
+        {nextTracks.length > 0 && (
+          <div style={{ marginTop: 18, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 14 }}>
+            <p style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(255,255,255,0.35)", marginBottom: 10 }}>A continuación</p>
+            {nextTracks.slice(0, 3).map((t, i) => (
+              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: i < 2 ? 8 : 0 }}>
+                <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.3)", width: 14, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
+                <div style={{ width: 30, height: 30, borderRadius: 4, overflow: "hidden", flexShrink: 0 }}>
+                  {t.coverImage
+                    ? <img src={t.coverImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : <div style={{ width: "100%", height: "100%", background: CINEMA[t.cover] }} />
+                  }
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "rgba(255,255,255,0.85)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.title}</div>
+                  <div style={{ fontSize: "0.66rem", color: "rgba(255,255,255,0.38)" }}>{t.artist}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </PhotoCard>
   );
@@ -184,7 +235,7 @@ function ContinueCard({ track, active, playing, onPlay }: { track: Track; active
           <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", gap: 5, marginBottom: 6 }}>
               <span style={{ fontSize: "0.57rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.14)", borderRadius: 3, padding: "2px 6px" }}>{track.genre}</span>
-              <span style={{ fontSize: "0.57rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.14)", borderRadius: 3, padding: "2px 6px" }}>{track.mood}</span>
+              <span style={{ fontSize: "0.57rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.14)", borderRadius: 3, padding: "2px 6px" }}>{MOOD_DISPLAY[track.mood] ?? track.mood}</span>
             </div>
             <div style={{ fontSize: "0.87rem", fontWeight: 700, color: active ? "var(--brand)" : "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 188 }}>{track.title}</div>
           </div>
@@ -215,7 +266,7 @@ function StationCard({ playlist, coverSrc, trackCount, active, playing, onPlay }
         <div style={{ padding: "0 14px 14px" }}>
           <div style={{ fontSize: "0.92rem", fontWeight: 700, color: active ? "var(--brand)" : "#fff", marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{playlist.title}</div>
           <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.48)", lineHeight: 1.4, overflow: "hidden", maxHeight: "2.8em" }}>{playlist.description}</div>
-          {trackCount > 0 && <div style={{ fontSize: "0.62rem", color: "rgba(255,255,255,0.28)", marginTop: 5 }}>{trackCount} tracks</div>}
+          {trackCount > 0 && <div style={{ fontSize: "0.62rem", color: "rgba(255,255,255,0.28)", marginTop: 5 }}>{trackCount} piezas</div>}
         </div>
       </PhotoCard>
     </button>
@@ -238,7 +289,7 @@ function TrendCard({ track, rank, active, playing, onPlay }: { track: Track; ran
         }
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.05) 60%)" }} />
         <span style={{ position: "absolute", left: 12, bottom: 10, fontSize: "2.2rem", fontWeight: 900, color: "rgba(255,255,255,0.9)", lineHeight: 1, textShadow: "0 2px 16px rgba(0,0,0,0.9)" }}>{rank}</span>
-        <button onClick={handleLike} style={{ position: "absolute", right: 8, top: 8, background: "none", border: "none", cursor: "pointer", padding: 6, opacity: hov || liked ? 1 : 0, transition: "opacity 0.18s" }}><HeartI on={liked} /></button>
+        <div role="button" tabIndex={0} onClick={handleLike} onKeyDown={e => e.key === "Enter" && handleLike(e as unknown as React.MouseEvent)} style={{ position: "absolute", right: 8, top: 8, cursor: "pointer", padding: 6, opacity: hov || liked ? 1 : 0, transition: "opacity 0.18s" }}><HeartI on={liked} /></div>
         <div style={{ position: "absolute", right: 10, bottom: 10, width: 36, height: 36, borderRadius: "50%", background: "var(--brand)", color: "var(--brand-ink)", display: "flex", alignItems: "center", justifyContent: "center", opacity: hov || active ? 1 : 0, transform: hov || active ? "scale(1)" : "scale(0.8)", transition: "all 0.18s" }}>
           {active && playing ? <PauseI s={14} /> : <PlayI s={14} />}
         </div>
@@ -276,14 +327,15 @@ function NewCard({ track, active, playing, onPlay }: { track: Track; active: boo
 // ── Mood tile ──────────────────────────────────────────────────────────────────
 function MoodTile({ mood, onPlay, hasContent }: { mood: { slug: string; name: string; cover: CoverVariant; trackCount: number }; onPlay: () => void; hasContent: boolean }) {
   const [hov, setHov] = useState(false);
+  const displayName = MOOD_DISPLAY[mood.name] ?? mood.name;
   return (
     <button onClick={onPlay} disabled={!hasContent} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ border: "none", background: "transparent", cursor: hasContent ? "pointer" : "default", padding: 0, width: "100%", opacity: hasContent ? 1 : 0.38 }}>
       <div style={{ position: "relative", borderRadius: 10, overflow: "hidden", height: 100, background: CINEMA[mood.cover], transform: hov && hasContent ? "scale(1.02)" : "scale(1)", transition: "transform 0.2s" }}>
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.35) 100%)" }} />
         <div style={{ position: "relative", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px" }}>
-          <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "#fff", textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>{mood.name}</span>
-          <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.48)", marginTop: 4 }}>{mood.trackCount} tracks</span>
+          <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "#fff", textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>{displayName}</span>
+          <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.48)", marginTop: 4 }}>{mood.trackCount} {mood.trackCount === 1 ? "pieza" : "piezas"}</span>
         </div>
       </div>
     </button>
@@ -296,15 +348,101 @@ function ArtistCircle({ name, trackCount, variant, onPlay }: { name: string; tra
   return (
     <button onClick={onPlay} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ flexShrink: 0, width: 145, border: "none", background: "transparent", cursor: "pointer", padding: 0, transform: hov ? "scale(1.04)" : "scale(1)", transition: "transform 0.2s" }}>
+      {/*
+        artistImageUrl: null — replace with Supabase Storage URL when artist photos are uploaded.
+        Path suggestion: artists/[slug]/portrait.jpg (400×400 square)
+      */}
       <div style={{ width: 145, height: 145, borderRadius: "50%", background: CINEMA[variant], overflow: "hidden", position: "relative", marginBottom: 11, boxShadow: "0 8px 32px rgba(0,0,0,0.55)" }}>
         <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.6rem", opacity: 0.28, color: "#fff" }}>♪</span>
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 60%)" }} />
       </div>
       <div style={{ textAlign: "center" }}>
         <div style={{ fontSize: "0.86rem", fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
-        <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.44)", marginTop: 3 }}>{trackCount} {trackCount === 1 ? "track" : "tracks"}</div>
+        <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.44)", marginTop: 3 }}>{trackCount} {trackCount === 1 ? "pieza" : "piezas"}</div>
       </div>
     </button>
+  );
+}
+
+// ── Historia detrás de la canción ─────────────────────────────────────────────
+function TrackStorySection({ tracks, heroTrack, isPlaying, onPlay, PAD }: {
+  tracks: Track[]; heroTrack: Track | null; isPlaying: boolean; onPlay: (t: Track) => void; PAD: number;
+}) {
+  const story = heroTrack
+    ? (RADIO_STORIES.find(s => s.trackId === heroTrack.id || s.title === heroTrack.title) ?? RADIO_STORIES[0])
+    : RADIO_STORIES[0];
+
+  if (!story) return null;
+
+  const storyTrack = story.trackId
+    ? (tracks.find(t => t.id === story.trackId) ?? heroTrack)
+    : (tracks.find(t => t.title === story.title) ?? heroTrack);
+
+  /*
+   * Image priority chain:
+   * 1. story.imageUrl       — editorial photo (cinematic, added by admin)
+   * 2. story.coverUrl       — album cover art (added by admin)
+   * 3. storyTrack.coverImage — catalog track art (auto from upload)
+   * 4. CINEMA[story.coverVariant] — gradient fallback (always available)
+   *
+   * To add a real image: set story.imageUrl in lib/radio/stories.ts
+   * to a Supabase Storage public URL.
+   */
+  const imageSrc = story.imageUrl ?? story.coverUrl ?? storyTrack?.coverImage ?? null;
+  const gradient = CINEMA[story.coverVariant];
+
+  const [hov, setHov] = useState(false);
+
+  return (
+    <section style={{ padding: `0 ${PAD}px 56px` }}>
+      {/* Section label — editorial divider style */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 32 }}>
+        <div style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.08)" }} />
+        <span style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.18em", color: "rgba(255,255,255,0.3)", whiteSpace: "nowrap" }}>
+          Historia detrás de la canción
+        </span>
+        <div style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.08)" }} />
+      </div>
+
+      {/* Editorial card */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 48, alignItems: "center", background: "rgba(255,255,255,0.025)", borderRadius: 18, padding: "40px 44px", border: "1px solid rgba(255,255,255,0.06)" }} className="zl-story-grid">
+        {/* Left: cover / editorial photo */}
+        <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", aspectRatio: "3/4" }}>
+          {imageSrc
+            ? <img src={imageSrc} alt={story.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            : <div style={{ width: "100%", height: "100%", background: gradient }} />
+          }
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 55%)" }} />
+          {story.genre && (
+            <span style={{ position: "absolute", top: 14, left: 14, fontSize: "0.58rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", background: "var(--brand)", color: "var(--brand-ink)", borderRadius: 4, padding: "3px 8px" }}>
+              {story.genre}
+            </span>
+          )}
+        </div>
+
+        {/* Right: story text */}
+        <div>
+          <h3 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 700, letterSpacing: "-0.035em", color: "#fff", lineHeight: 1.08, marginBottom: 10 }}>
+            {story.title}
+          </h3>
+          <p style={{ fontSize: "0.88rem", color: "rgba(255,255,255,0.38)", marginBottom: 28, letterSpacing: "0.01em" }}>
+            {story.artist}
+          </p>
+          <p style={{ fontSize: "1.02rem", color: "rgba(255,255,255,0.7)", lineHeight: 1.8, maxWidth: 500, marginBottom: 36 }}>
+            {story.story}
+          </p>
+          <button
+            onClick={() => storyTrack && onPlay(storyTrack)}
+            onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+            disabled={!storyTrack}
+            style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "12px 26px", background: hov ? "var(--brand)" : "rgba(149,249,8,0.12)", color: hov ? "var(--brand-ink)" : "var(--brand)", border: "1px solid rgba(149,249,8,0.35)", borderRadius: 24, cursor: storyTrack ? "pointer" : "default", fontSize: "0.9rem", fontWeight: 700, transition: "all 0.2s", boxShadow: hov ? "0 8px 24px rgba(149,249,8,0.3)" : "none" }}
+          >
+            {isPlaying && storyTrack?.id === heroTrack?.id ? <PauseI s={17} /> : <PlayI s={17} />}
+            Escuchar ahora
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -317,14 +455,27 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
 
   const [user,        setUser]   = useState<User | null>(null);
   const [recent,      setRecent] = useState<Track[]>([]);
-  const [greetPrefix, setGP]    = useState("");
-  const [greetAccent, setGA]    = useState("");
-  const [menuOpen,    setMenu]  = useState(false);
-  const [moodFilter,  setFilter]= useState(MOOD_FILTERS[0]);
+  const [greeting,    setGreet]  = useState({ prefix: "", accent: "", subtitle: "" });
+  const [menuOpen,    setMenu]   = useState(false);
+  const [moodFilter,  setFilter] = useState(MOOD_FILTERS[0]);
+  const [isMobile,    setMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setMobile(window.innerWidth <= 900);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const heroTrack = player.track
     ? (tracks.find(t => t.id === player.track!.id) ?? tracks.find(t => t.staffHero) ?? tracks.find(t => t.featured) ?? tracks[0])
     : (tracks.find(t => t.staffHero) ?? tracks.find(t => t.featured) ?? tracks[0]);
+
+  // Next tracks from the live player queue (for "A continuación")
+  const nextTracks: Track[] = player.queue
+    .slice(player.queueIndex + 1, player.queueIndex + 4)
+    .map(pt => tracks.find(t => t.id === pt.id))
+    .filter((t): t is Track => !!t);
 
   const trending         = tracks.filter(t => t.trending);
   const newTracks        = tracks.filter(t => t.isNew);
@@ -338,7 +489,7 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
     disc:  [...tracks].reverse().find(t => !!t.coverImage)?.coverImage ?? null,
   };
 
-  useEffect(() => { const [p, a] = getGreetingParts(); setGP(p); setGA(a); }, []);
+  useEffect(() => { setGreet(getGreeting()); }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -349,13 +500,12 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
   }, []);
 
   useEffect(() => {
-    const saved = loadPlayer();
-    if (saved.queue?.length) {
-      const ids = new Set(saved.queue.map(pt => pt.id));
-      setRecent(tracks.filter(t => ids.has(t.id)).slice(0, 8));
+    if (player.queue.length && player.queueIndex >= 0) {
+      const prevIds = new Set(player.queue.slice(0, player.queueIndex).map(pt => pt.id));
+      setRecent(tracks.filter(t => prevIds.has(t.id)).slice(-8).reverse());
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [player.queueIndex]);
 
   const toggle = (t: Track, queue?: Track[]) => {
     const pt = toPlayerTrack(t);
@@ -402,14 +552,17 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
 
         <SbSection label="Explora" />
         <SbItem icon={<WaveI />}  label="Estaciones"     href="#stations" indent onClick={() => setMenu(false)} />
-        <SbItem icon={<TrendI />} label="Top en Radio"   href="#trending" indent onClick={() => setMenu(false)} />
-        <SbItem icon={<NewI />}   label="Nuevos sonidos" href="#new"      indent onClick={() => setMenu(false)} />
+        <SbItem icon={<TrendI />} label="Lo que suena"   href="#trending" indent onClick={() => setMenu(false)} />
+        <SbItem icon={<NewI />}   label="Recién llegó"   href="#new"      indent onClick={() => setMenu(false)} />
 
-        <SbSection label="Estados de ánimo" />
+        {/* ESCUCHA POR MOMENTO — friendly, everyday language */}
+        <SbSection label="Escucha por momento" />
         {moods.slice(0, 6).map(m => (
-          <SbItem key={m.slug} label={m.name} href="#moods" indent onClick={() => { playMood(m.name); setMenu(false); }} />
+          <SbItem key={m.slug} label={MOOD_DISPLAY[m.name] ?? m.name} href="#moods" indent
+            onClick={() => { playMood(m.name); setMenu(false); }} />
         ))}
 
+        {/* Recientes from queue */}
         {recent.length > 0 && (
           <>
             <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "10px 4px" }} />
@@ -432,33 +585,35 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
           </>
         )}
 
+        {/* Bottom — no commercial language */}
         <div style={{ marginTop: "auto" }}>
           <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "12px 4px" }} />
           <div style={{ background: "rgba(149,249,8,0.05)", border: "1px solid rgba(149,249,8,0.18)", borderRadius: 10, padding: "14px 12px", margin: "0 0 10px" }}>
-            <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#fff", marginBottom: 3 }}>¿Buscas música para tus proyectos?</p>
-            <p style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.48)", marginBottom: 12, lineHeight: 1.45 }}>Explora el catálogo completo en Zoundlist.</p>
-            <a href="/" style={{ display: "block", textAlign: "center", padding: "8px 0", background: "var(--brand)", color: "var(--brand-ink)", borderRadius: 6, textDecoration: "none", fontSize: "0.76rem", fontWeight: 700 }}>Explorar catálogo</a>
+            <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#fff", marginBottom: 3 }}>Descubre más música</p>
+            <p style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.48)", marginBottom: 12, lineHeight: 1.45 }}>Todos los géneros. Sin límites. En Zoundlist.</p>
+            <a href="/" style={{ display: "block", textAlign: "center", padding: "8px 0", background: "var(--brand)", color: "var(--brand-ink)", borderRadius: 6, textDecoration: "none", fontSize: "0.76rem", fontWeight: 700 }}>Ir a Zoundlist →</a>
           </div>
           {user && <SbItem label="Mi panel" href="/dashboard" />}
         </div>
       </aside>
 
       {/* Mobile hamburger */}
-      <button onClick={() => setMenu(v => !v)} aria-label="Menú" className="zl-radio-hamburger" style={{ display: "none" }}>
+      <button onClick={() => setMenu(v => !v)} aria-label="Menú" className="zl-radio-hamburger" style={{ display: isMobile ? "flex" : "none" }}>
         <span /><span /><span />
       </button>
       {menuOpen && <div onClick={() => setMenu(false)} aria-hidden="true" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", zIndex: 48, backdropFilter: "blur(4px)" }} />}
 
       {/* ── MAIN ─────────────────────────────────────────────────────────────── */}
-      <main className="zl-radio-main" style={{ flex: 1, marginLeft: SB_W, paddingBottom: 100, overflowX: "hidden", minWidth: 0 }}>
+      <main className="zl-radio-main" style={{ flex: 1, marginLeft: isMobile ? 0 : SB_W, paddingBottom: 100, overflowX: "hidden", minWidth: 0, paddingTop: isMobile ? 60 : 0 }}>
 
         {/* HERO ─────────────────────────────────────────────────────────────── */}
         <section style={{ padding: `48px ${PAD}px 44px` }}>
+          {/* Greeting with human subtitle */}
           <h1 style={{ fontSize: "clamp(2.2rem, 4vw, 3.2rem)", fontWeight: 700, letterSpacing: "-0.04em", lineHeight: 1.05, marginBottom: 8 }}>
-            <span style={{ color: "#fff" }}>{greetPrefix}</span>
-            <span style={{ color: "var(--brand)" }}>{greetAccent || "–"}</span>
+            <span style={{ color: "#fff" }}>{greeting.prefix}</span>
+            <span style={{ color: "var(--brand)" }}>{greeting.accent || "–"}</span>
           </h1>
-          <p style={{ fontSize: "0.94rem", color: "rgba(255,255,255,0.42)", marginBottom: 28 }}>Dale play y déjate llevar.</p>
+          <p style={{ fontSize: "0.94rem", color: "rgba(255,255,255,0.45)", marginBottom: 28 }}>{greeting.subtitle}</p>
 
           {/* Mood filter pills */}
           <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", marginBottom: 28 }}>
@@ -470,14 +625,19 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
             ))}
           </div>
 
-          {/* Hero grid: NOW PLAYING + 4 shortcuts */}
+          {/* Hero grid: NOW PLAYING + A continuación + 4 shortcuts */}
           {heroTrack && (
-            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, height: 340 }} className="zl-radio-hero-grid">
-              <NowPlayingCard track={heroTrack} isPlaying={player.isPlaying && playingId === heroTrack.id} onToggle={() => toggle(heroTrack)} />
+            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12, height: 420 }} className="zl-radio-hero-grid">
+              <NowPlayingCard
+                track={heroTrack}
+                nextTracks={nextTracks}
+                isPlaying={player.isPlaying && playingId === heroTrack.id}
+                onToggle={() => toggle(heroTrack)}
+              />
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 10 }}>
                 <ShortcutCard title="Mix del día" subtitle="Hecho para ti" src={shortcutBgs.mix} variant="lime" href="#stations" />
                 <ShortcutCard title="Lo que está sonando" subtitle="Top 50" src={shortcutBgs.trend} variant="violet" href="#trending" />
-                <ShortcutCard title="Nuevos sonidos" subtitle="Estrenos de la semana" src={shortcutBgs.fresh} variant="teal" href="#new" />
+                <ShortcutCard title="Recién llegó" subtitle="Estrenos de la semana" src={shortcutBgs.fresh} variant="teal" href="#new" />
                 <ShortcutCard title="Descubrimientos" subtitle="Artistas que quizás no conoces" src={shortcutBgs.disc} variant="gold" href="#artists" />
               </div>
             </div>
@@ -496,7 +656,7 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
 
         {/* Mix del día */}
         <section id="stations" style={{ padding: `0 ${PAD}px 48px` }}>
-          <SecHead title="Mix del día para ti" subtitle={greetAccent ? `Hecho para tu ${greetAccent}` : "Curado para este momento"} />
+          <SecHead title="Mix del día para ti" subtitle={greeting.accent ? `Hecho para tu ${greeting.accent}` : "Curado para este momento"} />
           <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 8, scrollbarWidth: "none" }}>
             {visiblePlaylists.map(pl => (
               <StationCard key={pl.id} playlist={pl} coverSrc={stationCoverSrc(tracks, pl)} trackCount={tracksForStation(tracks, pl).length} active={isStationActive(pl)} playing={player.isPlaying} onPlay={() => playStation(pl)} />
@@ -507,27 +667,36 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
         {/* Lo que está sonando */}
         {trending.length > 0 && (
           <section id="trending" style={{ padding: `0 ${PAD}px 48px` }}>
-            <SecHead title="Lo que está sonando" subtitle="Las más escuchadas en Radio" />
+            <SecHead title="Lo que está sonando" subtitle="Las más escuchadas ahora mismo" />
             <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8, scrollbarWidth: "none" }}>
               {trending.slice(0, 10).map((t, i) => <TrendCard key={t.id} track={t} rank={i + 1} active={playingId === t.id} playing={player.isPlaying} onPlay={() => toggle(t, trending)} />)}
             </div>
           </section>
         )}
 
-        {/* Nuevos sonidos */}
+        {/* Historia detrás de la canción — editorial section */}
+        <TrackStorySection
+          tracks={tracks}
+          heroTrack={heroTrack ?? null}
+          isPlaying={player.isPlaying && playingId === heroTrack?.id}
+          onPlay={(t) => toggle(t)}
+          PAD={PAD}
+        />
+
+        {/* Recién llegó (new tracks) */}
         {newTracks.length > 0 && (
           <section id="new" style={{ padding: `0 ${PAD}px 48px` }}>
-            <SecHead title="Nuevos sonidos" subtitle="Estrenos de esta semana" />
+            <SecHead title="Recién llegó" subtitle="Estrenos de esta semana" />
             <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 8, scrollbarWidth: "none" }}>
               {newTracks.map(t => <NewCard key={t.id} track={t} active={playingId === t.id} playing={player.isPlaying} onPlay={() => toggle(t, newTracks)} />)}
             </div>
           </section>
         )}
 
-        {/* ¿Qué quieres sentir? */}
+        {/* ¿Qué quieres sentir? — with friendly display names */}
         {moods.length > 0 && (
           <section id="moods" style={{ padding: `0 ${PAD}px 48px` }}>
-            <SecHead title="¿Qué quieres sentir?" />
+            <SecHead title="¿Qué quieres sentir?" subtitle="Elige tu momento" />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }} className="zl-radio-mood-grid">
               {moods.map(m => {
                 const has = tracks.some(t => t.mood.toLowerCase().includes(m.name.toLowerCase().split(" ")[0]) && !!t.audioUrl);
@@ -537,7 +706,7 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
           </section>
         )}
 
-        {/* Artistas */}
+        {/* Artistas que debes escuchar */}
         {artists.length > 0 && (
           <section id="artists" style={{ padding: `0 ${PAD}px 48px` }}>
             <SecHead title="Artistas que debes escuchar" />
@@ -571,6 +740,10 @@ export default function RadioClient({ catalog }: { catalog: Catalog }) {
         @keyframes rp-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.45;transform:scale(.8)} }
         .rp-dot { animation: rp-pulse 2s ease-in-out infinite; }
 
+        @media (max-width: 1100px) {
+          .zl-story-grid { grid-template-columns: 1fr !important; }
+          .zl-story-grid > *:first-child { aspect-ratio: 16/7 !important; }
+        }
         @media (max-width: 1024px) {
           .zl-radio-hero-grid { grid-template-columns: 1fr !important; height: auto !important; }
           .zl-radio-hero-grid > div:last-child { height: 180px; }

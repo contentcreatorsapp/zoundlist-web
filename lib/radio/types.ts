@@ -1,5 +1,36 @@
 import type { CoverVariant } from "@/types/catalog";
 
+/**
+ * Editorial story attached to a track.
+ * Static for now — migrate to Supabase table `radio_stories` when ready.
+ * Image fields accept Supabase Storage public URLs.
+ */
+export interface TrackStory {
+  id: string;
+  /** Catalog track ID. null = match by title/artist, then fallback to RADIO_STORIES[0]. */
+  trackId: string | null;
+  title: string;
+  artist: string;
+  /** 2-4 sentences. Replace with real producer/artist copy. */
+  story: string;
+  /**
+   * Editorial image (cinematic photo, not album art).
+   * Null = fall through to coverUrl → CINEMA[coverVariant].
+   * Future: Supabase Storage URL (radio-stories/[id]/editorial.jpg)
+   */
+  imageUrl: string | null;
+  /**
+   * Album / track cover art.
+   * Null = fall through to CINEMA[coverVariant].
+   * Future: Supabase Storage URL or track.coverImage
+   */
+  coverUrl: string | null;
+  /** Fallback gradient key when no image is available. */
+  coverVariant: CoverVariant;
+  /** Display label shown as a badge on the image. */
+  genre: string | null;
+}
+
 export interface EditorialPlaylist {
   id: string;
   title: string;
