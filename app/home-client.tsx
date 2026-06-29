@@ -344,6 +344,12 @@ export default function HomeClient({ catalog }: { catalog: Catalog }) {
         <div className="zl-wrap zl-nav__inner">
           <Brand height={24} />
 
+          {/* Radio pill — always visible on mobile */}
+          <a href="/radio" className="zl-nav__radio-pill zl-show-mobile-radio">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm9-2.17v10.34c1.86-.95 3-2.85 3-5.17s-1.14-4.22-3-5.17z"/></svg>
+            Radio
+          </a>
+
           <ul className="zl-nav__links zl-hide-md">
             <li><a href="/radio" className="zl-nav__link">Radio</a></li>
             <li><a href="#featured" className="zl-nav__link">Descubrir</a></li>
