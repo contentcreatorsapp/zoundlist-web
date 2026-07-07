@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   const { data: albums, error } = await supabase
     .from("albums")
-    .select("id, title, cover_url")
+    .select("id, title, cover_image")
     .eq("uploader_id", user.id)
     .order("created_at", { ascending: false })
     .limit(50);
