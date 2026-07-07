@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zoundlist Suno Importer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+  <header>
+    <div class="logo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" fill="#95F908" opacity="0.15"/>
+        <path d="M9 18V6l12 6-12 6z" fill="#95F908"/>
+      </svg>
+      <span>Zoundlist</span>
+    </div>
+    <span class="badge" id="auth-badge">•••</span>
+  </header>
+
+  <!-- Auth section -->
+  <div id="section-auth" class="section hidden">
+    <p class="muted">Connect your Zoundlist account to start importing.</p>
+    <button class="btn-primary" id="btn-connect">Open Zoundlist &amp; Connect</button>
+    <p class="hint">Open suno.com in the same browser after connecting.</p>
+  </div>
+
+  <!-- Connected section -->
+  <div id="section-connected" class="section hidden">
+
+    <!-- Stats bar -->
+    <div class="stats-bar">
+      <div class="stat">
+        <span class="stat-num" id="stat-queued">0</span>
+        <span class="stat-lbl">Queued</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-num success" id="stat-done">0</span>
+        <span class="stat-lbl">Done</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-num error" id="stat-failed">0</span>
+        <span class="stat-lbl">Failed</span>
+      </div>
+    </div>
+
+    <!-- Format preference -->
+    <div class="format-row">
+      <span class="format-lbl">Format:</span>
+      <div class="format-toggle">
+        <button class="fmt-btn active" id="fmt-wav">WAV</button>
+        <button class="fmt-btn" id="fmt-mp3">MP3</button>
+      </div>
+      <span class="hint-inline" id="wav-hint">lossless preferred</span>
+    </div>
+
+    <!-- Queue list -->
+    <div id="queue-list"></div>
+
+    <!-- Empty state -->
+    <div id="queue-empty" class="empty-state hidden">
+      <p>No imports queued.</p>
+      <p class="muted">Open suno.com and click<br><strong>⬇ Zoundlist</strong> on any song.</p>
+    </div>
+
+    <!-- Footer actions -->
+    <div class="footer-actions" id="footer-actions">
+      <button class="btn-ghost" id="btn-clear">Clear done/failed</button>
+      <button class="btn-ghost danger" id="btn-disconnect">Disconnect</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
