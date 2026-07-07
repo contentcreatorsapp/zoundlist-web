@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getMyProfile, canUpload } from "@/services/profile";
 import { getCatalog } from "@/services/catalog";
 import { Brand } from "@/components/brand";
-import { UploadForm } from "./upload-form";
+import { UploadTabs } from "./upload-tabs";
 
 export const metadata = { title: "Subir música" };
 export const dynamic = "force-dynamic";
@@ -36,7 +36,7 @@ export default async function UploadPage({
         <p className="zl-muted" style={{ maxWidth: 520, marginBottom: 36 }}>
           {albumId ? "El track se añadirá a este álbum automáticamente." : "Carga un track al catálogo. Aparecerá en la home en ~1 minuto."}
         </p>
-        <UploadForm genres={genres} moods={moods} albumId={albumId} />
+        <UploadTabs genres={genres} moods={moods} albumId={albumId} />
       </section>
     </main>
   );
