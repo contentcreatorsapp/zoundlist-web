@@ -1,54 +1,44 @@
 // ── Zoundlist Auth Content Script ────────────────────────────────────────────
-// Runs on zoundlist.com/* — reads Supabase session and sends token to extension.
+// Runs on zoundlist.com/* — fetches session JWT via cookie-auth API endpoint
+// and sends it to the extension background service worker.
+//
+// Why API endpoint instead of localStorage:
+//   @supabase/ssr stores sessions in HttpOnly cookies, not localStorage.
+//   The /api/extension/auth/token route reads the cookie on the server and
+//   returns the access_token safely.
 
 (function () {
   "use strict";
 
-  function extractSupabaseSession() {
+  async function sendAuthToExtension() {
     try {
-      // Find the Supabase session key — pattern: sb-{project_ref}-auth-token
-      const key = Object.keys(localStorage).find(
-        k => k.startsWith("sb-") && k.endsWith("-auth-token")
+      const res = await fetch("/api/extension/auth/token", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!res.ok) return; // not logged in or endpoint error
+
+      const { accessToken, expiresAt } = await res.json();
+      if (!accessToken) return;
+
+      chrome.runtime.sendMessage(
+        { type: "SET_AUTH", payload: { accessToken, refreshToken: null, expiresAt: expiresAt ?? null } },
+        (response) => {
+          if (chrome.runtime.lastError) return;
+          if (response?.ok) {
+            console.log("[Zoundlist Extension] Auth connected.");
+          }
+        }
       );
-      if (!key) return null;
-
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-
-      const parsed = JSON.parse(raw);
-      // Supabase stores either the session directly or nested under a key
-      const session = parsed?.session ?? parsed;
-      if (!session?.access_token) return null;
-
-      return {
-        accessToken:  session.access_token,
-        refreshToken: session.refresh_token ?? null,
-        expiresAt:    session.expires_at ?? null,
-      };
     } catch {
-      return null;
+      // Extension not installed, user not logged in, or network error — ignore.
     }
   }
 
-  function sendAuthToExtension() {
-    const session = extractSupabaseSession();
-    if (!session) return;
-
-    chrome.runtime.sendMessage({ type: "SET_AUTH", payload: session }, (response) => {
-      if (chrome.runtime.lastError) return; // extension not installed or unavailable
-      if (response?.ok) {
-        console.log("[Zoundlist Extension] Auth connected.");
-      }
-    });
-  }
-
-  // Send immediately
+  // Run immediately
   sendAuthToExtension();
 
-  // Also re-send if localStorage changes (token refresh)
-  window.addEventListener("storage", (e) => {
-    if (e.key?.startsWith("sb-") && e.key?.endsWith("-auth-token")) {
-      sendAuthToExtension();
-    }
-  });
+  // Re-run on focus (handles the case where the user logged in on another tab)
+  window.addEventListener("focus", sendAuthToExtension);
 })();

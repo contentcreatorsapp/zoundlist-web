@@ -70,15 +70,17 @@ Navigate to `suno.com/song/{uuid}` — a large **"Import to Zoundlist"** button 
 
 ## API endpoints (Zoundlist)
 
-The extension calls these three authenticated routes:
+The extension calls these authenticated routes:
 
 | Endpoint | Purpose |
 |----------|---------|
+| `GET /api/extension/auth/token` | Returns access_token for the logged-in user (cookie auth) |
 | `POST /api/extension/suno/analyze` | Analyze URL → metadata + WAV availability |
 | `POST /api/extension/suno/import` | Import single track (WAV or MP3) |
 | `POST /api/extension/suno/bulk-import` | Import up to 10 tracks in one request |
 
-All routes require `Authorization: Bearer <supabase_jwt>`.
+`/auth/token` uses cookie auth (same-origin, called from `zoundlist.com`).
+All `/suno/*` routes require `Authorization: Bearer <supabase_jwt>`.
 
 ---
 
