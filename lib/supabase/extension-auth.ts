@@ -28,7 +28,7 @@ export function createUserSupabase(token: string) {
 /** Standard CORS headers for extension API routes */
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type",
 } as const;
 
