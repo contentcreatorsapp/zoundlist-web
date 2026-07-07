@@ -12,6 +12,15 @@ function extractSunoId(url: string): string | null {
   }
 }
 
+function isSunoShortUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return SUNO_HOSTNAMES.includes(u.hostname) && /^\/s\/[A-Za-z0-9_-]+/.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
 function fmtDuration(secs: number): string {
   const m = Math.floor(secs / 60);
   const s = Math.floor(secs % 60);
@@ -46,22 +55,20 @@ export const sunoProvider: MusicImportProvider = {
   canHandle(url: string): boolean {
     try {
       const u = new URL(url);
-      return SUNO_HOSTNAMES.includes(u.hostname) && /\/song\/[a-f0-9-]+/i.test(u.pathname);
+      return SUNO_HOSTNAMES.includes(u.hostname) &&
+        (/\/song\/[a-f0-9-]+/i.test(u.pathname) || /^\/s\/[A-Za-z0-9_-]+/.test(u.pathname));
     } catch {
       return false;
     }
   },
 
   async analyze(url: string): Promise<AnalyzeResult> {
-    const id = extractSunoId(url);
-    if (!id) {
-      return { success: false, audioAccessible: false, error: "No se pudo extraer el ID de la canción. Pega un enlace público de Suno (ej: suno.com/song/…)." };
-    }
-
-    // ── Fetch page HTML ───────────────────────────────────────────────────────
+    // ── Fetch page HTML (follows redirects — short /s/ URLs resolve to /song/{uuid}) ─
     let html: string;
+    let finalUrl = url;
     try {
       const res = await fetch(url, {
+        redirect: "follow",
         headers: {
           "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
           "Accept": "text/html,application/xhtml+xml",
@@ -69,6 +76,7 @@ export const sunoProvider: MusicImportProvider = {
         },
         signal: AbortSignal.timeout(15_000),
       });
+      finalUrl = res.url; // resolved URL after any redirects
       if (res.status === 404) {
         return { success: false, audioAccessible: false, error: "Canción no encontrada. Verifica el enlace o que la canción sea pública." };
       }
@@ -81,6 +89,12 @@ export const sunoProvider: MusicImportProvider = {
         ? "Tiempo de espera agotado al conectar con Suno."
         : "No se pudo conectar con Suno. Revisa tu conexión.";
       return { success: false, audioAccessible: false, error: msg };
+    }
+
+    // Extract UUID from final URL (works for both /song/{uuid} and /s/ short URLs after redirect)
+    const id = extractSunoId(finalUrl);
+    if (!id && !isSunoShortUrl(url)) {
+      return { success: false, audioAccessible: false, error: "No se pudo extraer el ID de la canción. Pega un enlace público de Suno." };
     }
 
     let title: string | null        = null;
@@ -132,7 +146,7 @@ export const sunoProvider: MusicImportProvider = {
     if (title) title = title.replace(/\s*[\|—–]\s*Suno.*$/i, "").trim() || null;
 
     // ── Method 3: Known CDN pattern as last resort ────────────────────────────
-    if (!audioUrl) {
+    if (!audioUrl && id) {
       audioUrl = `https://cdn1.suno.ai/${id}.mp3`;
     }
 

@@ -30,8 +30,11 @@ const IMPORT_STAGES = [
 function isValidSunoUrl(url: string): boolean {
   try {
     const u = new URL(url);
-    return ["suno.com", "www.suno.com", "suno.ai", "www.suno.ai"].includes(u.hostname) &&
-           /\/song\/[a-f0-9-]+/i.test(u.pathname);
+    const isSunoHost = ["suno.com", "www.suno.com", "suno.ai", "www.suno.ai"].includes(u.hostname);
+    return isSunoHost && (
+      /\/song\/[a-f0-9-]+/i.test(u.pathname) ||  // full URL: /song/{uuid}
+      /^\/s\/[A-Za-z0-9_-]+/.test(u.pathname)    // short URL: /s/{code}
+    );
   } catch { return false; }
 }
 
