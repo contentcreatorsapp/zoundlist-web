@@ -59,22 +59,24 @@ export async function POST(req: NextRequest) {
 
   // ── 1. Download audio ────────────────────────────────────────────────────────
   let audioBuffer: ArrayBuffer;
+  let downloadedWav = isWav; // tracks whether we actually got WAV or fell back to MP3
+  const browserUA = "Mozilla/5.0 (compatible; Zoundlist/1.0; +https://zoundlist.com)";
   try {
     const res = await fetch(effectiveAudioUrl, {
-      headers: { "User-Agent": "Zoundlist/1.0 (+https://zoundlist.com)" },
+      headers: { "User-Agent": browserUA },
       signal: AbortSignal.timeout(50_000),
     });
     if (!res.ok) throw new Error(`${res.status}`);
     audioBuffer = await res.arrayBuffer();
 
-    // If WAV failed, fallback to mp3
     if (isWav && audioBuffer.byteLength < 1000) throw new Error("WAV response too small");
   } catch (err) {
     if (isWav && metadata.audioUrl) {
-      // Fallback to mp3
+      // WAV failed — fallback to mp3
+      downloadedWav = false;
       try {
         const r2 = await fetch(metadata.audioUrl, {
-          headers: { "User-Agent": "Zoundlist/1.0" },
+          headers: { "User-Agent": browserUA },
           signal: AbortSignal.timeout(50_000),
         });
         if (!r2.ok) throw new Error(`mp3 fallback ${r2.status}`);
@@ -93,10 +95,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Final format (might have fallen back to mp3)
-  const finalExt  = isWav ? "wav" : "mp3";
-  const finalMime = isWav ? "audio/wav" : "audio/mpeg";
-  const finalPath = isWav ? storagePath : storagePath.replace(".wav", ".mp3");
+  // Final format based on what was actually downloaded (WAV may have fallen back)
+  const finalExt  = downloadedWav ? "wav" : "mp3";
+  const finalMime = downloadedWav ? "audio/wav" : "audio/mpeg";
+  const finalPath = downloadedWav ? storagePath : storagePath.replace(/\.wav$/, ".mp3");
 
   // ── 2. Upload audio to Storage ───────────────────────────────────────────────
   const { error: storageErr } = await admin.storage.from("tracks").upload(finalPath, audioBuffer, {
