@@ -29,7 +29,7 @@ async function setQueue(queue) {
 
 async function getPrefs() {
   const { [STORAGE_KEY_PREFS]: prefs } = await chrome.storage.local.get(STORAGE_KEY_PREFS);
-  return { format: "wav", ...prefs };
+  return { format: "wav", albumId: null, ...prefs };
 }
 
 async function updateQueueItem(uuid, patch) {
@@ -206,7 +206,9 @@ async function handleMessage(msg, sender) {
     }
 
     case "QUEUE_TRACK": {
-      const { uuid, url, title, coverUrl, duration, albumId } = msg.payload;
+      const { uuid, url, title, coverUrl, duration } = msg.payload;
+      const prefs = await getPrefs();
+      const albumId = msg.payload.albumId ?? prefs.albumId ?? null;
       const queue = await getQueue();
       // Avoid duplicate
       if (queue.some(i => i.uuid === uuid)) return { ok: true, duplicate: true };
@@ -217,7 +219,9 @@ async function handleMessage(msg, sender) {
     }
 
     case "QUEUE_TRACKS": {
-      const { tracks, albumId } = msg.payload;
+      const { tracks } = msg.payload;
+      const prefs = await getPrefs();
+      const albumId = msg.payload.albumId ?? prefs.albumId ?? null;
       const queue = await getQueue();
       let added = 0;
       for (const t of tracks) {
@@ -260,6 +264,27 @@ async function handleMessage(msg, sender) {
       const current = await getPrefs();
       await chrome.storage.local.set({ [STORAGE_KEY_PREFS]: { ...current, format: msg.payload.format } });
       return { ok: true };
+    }
+
+    case "SET_ALBUM_PREF": {
+      const current = await getPrefs();
+      await chrome.storage.local.set({ [STORAGE_KEY_PREFS]: { ...current, albumId: msg.payload.albumId ?? null } });
+      return { ok: true };
+    }
+
+    case "GET_ALBUMS": {
+      const auth = await getAuth();
+      if (!auth) return { albums: [] };
+      try {
+        const res = await fetch(`${ZOUNDLIST_BASE}/api/extension/albums`, {
+          headers: { "Authorization": `Bearer ${auth.accessToken}` },
+        });
+        if (!res.ok) return { albums: [] };
+        const data = await res.json();
+        return { albums: data.albums ?? [] };
+      } catch {
+        return { albums: [] };
+      }
     }
 
     case "GET_PREFS":

@@ -21,9 +21,10 @@ const elStatFailed = document.getElementById("stat-failed");
 const elFmtWav     = document.getElementById("fmt-wav");
 const elFmtMp3     = document.getElementById("fmt-mp3");
 const elWavHint    = document.getElementById("wav-hint");
-const elBtnConnect = document.getElementById("btn-connect");
-const elBtnClear   = document.getElementById("btn-clear");
-const elBtnDisconn = document.getElementById("btn-disconnect");
+const elBtnConnect  = document.getElementById("btn-connect");
+const elBtnClear    = document.getElementById("btn-clear");
+const elBtnDisconn  = document.getElementById("btn-disconnect");
+const elAlbumSelect = document.getElementById("album-select");
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let isConnected = false;
@@ -164,11 +165,35 @@ async function refreshQueue() {
   } catch { /* service worker sleeping */ }
 }
 
+// ── Album selector ────────────────────────────────────────────────────────────
+async function loadAlbums(savedAlbumId) {
+  try {
+    const res = await sendMessage({ type: "GET_ALBUMS" });
+    const albums = res?.albums ?? [];
+
+    // Clear existing options except the default
+    elAlbumSelect.innerHTML = '<option value="">No album (draft only)</option>';
+
+    for (const album of albums) {
+      const opt = document.createElement("option");
+      opt.value       = album.id;
+      opt.textContent = album.title ?? "Untitled album";
+      if (album.id === savedAlbumId) opt.selected = true;
+      elAlbumSelect.appendChild(opt);
+    }
+  } catch { /* service worker not ready */ }
+}
+
+elAlbumSelect.addEventListener("change", () => {
+  sendMessage({ type: "SET_ALBUM_PREF", payload: { albumId: elAlbumSelect.value || null } });
+});
+
 // ── Format preference ─────────────────────────────────────────────────────────
 async function loadPrefs() {
   try {
     const res = await sendMessage({ type: "GET_PREFS" });
     applyFormat(res?.prefs?.format ?? "wav");
+    await loadAlbums(res?.prefs?.albumId ?? null);
   } catch { /* default */ }
 }
 

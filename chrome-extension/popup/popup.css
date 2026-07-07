@@ -158,6 +158,34 @@ header {
   color: rgba(255,255,255,0.25);
 }
 
+/* Album selector */
+.album-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.album-select {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 5px 8px;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(255,255,255,0.35)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+  transition: border-color 0.15s;
+}
+.album-select:focus { border-color: rgba(149,249,8,0.4); }
+.album-select option { background: #1a1a1a; color: #fff; }
+
 /* Queue list */
 #queue-list {
   max-height: 260px;
