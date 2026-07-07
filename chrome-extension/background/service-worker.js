@@ -38,7 +38,20 @@ async function updateQueueItem(uuid, patch) {
   if (idx !== -1) {
     queue[idx] = { ...queue[idx], ...patch };
     await setQueue(queue);
+    // Broadcast status change to all open Suno tabs
+    broadcastToSunoTabs({ type: "TRACK_STATUS", payload: { uuid, ...patch } });
   }
+}
+
+// Notify all open Suno tabs (best-effort, ignores errors)
+function broadcastToSunoTabs(msg) {
+  chrome.tabs.query({ url: ["https://suno.com/*", "https://www.suno.com/*"] })
+    .then(tabs => {
+      for (const tab of tabs) {
+        chrome.tabs.sendMessage(tab.id, msg).catch(() => {});
+      }
+    })
+    .catch(() => {});
 }
 
 // ── API calls ─────────────────────────────────────────────────────────────────
