@@ -49,6 +49,26 @@ function parseMeta(html: string, property: string): string | null {
   return raw ? decodeHTMLEntities(raw) : null;
 }
 
+// For short /s/ URLs that use client-side redirects: extract UUID from HTML metadata
+function extractSunoIdFromHtml(html: string): string | null {
+  // og:url is the canonical song URL: https://suno.com/song/{uuid}
+  const ogUrl = parseMeta(html, "og:url");
+  if (ogUrl) {
+    const id = extractSunoId(ogUrl);
+    if (id) return id;
+  }
+  // <link rel="canonical" href="...">
+  const canonMatch = html.match(/<link[^>]+rel="canonical"[^>]+href="([^"]*)"[^>]*>/i)
+    ?? html.match(/<link[^>]+href="([^"]*)"[^>]+rel="canonical"[^>]*>/i);
+  if (canonMatch?.[1]) {
+    const id = extractSunoId(canonMatch[1]);
+    if (id) return id;
+  }
+  // __NEXT_DATA__ may contain the clip ID directly
+  const ndMatch = html.match(/"id"\s*:\s*"([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})"/i);
+  return ndMatch?.[1] ?? null;
+}
+
 export const sunoProvider: MusicImportProvider = {
   platform: "suno",
 
@@ -91,8 +111,11 @@ export const sunoProvider: MusicImportProvider = {
       return { success: false, audioAccessible: false, error: msg };
     }
 
-    // Extract UUID from final URL (works for both /song/{uuid} and /s/ short URLs after redirect)
-    const id = extractSunoId(finalUrl);
+    // Extract UUID — 3 fallback layers:
+    // 1. Final URL after HTTP redirect (ideal case)
+    // 2. og:url / <link rel="canonical"> in HTML (JS-redirect short URLs)
+    // 3. First UUID found anywhere in __NEXT_DATA__ JSON
+    const id = extractSunoId(finalUrl) ?? extractSunoIdFromHtml(html);
     if (!id && !isSunoShortUrl(url)) {
       return { success: false, audioAccessible: false, error: "No se pudo extraer el ID de la canción. Pega un enlace público de Suno." };
     }
