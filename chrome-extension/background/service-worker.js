@@ -113,16 +113,19 @@ async function processItem(item) {
       return;
     }
 
-    const metadata   = analyzeResult.metadata;
-    const wavUrl     = (preferWav && analyzeResult.wavAvailable) ? analyzeResult.wavUrl : null;
-    const useWav     = preferWav && !!wavUrl;
+    const metadata = analyzeResult.metadata;
+    // Prefer client-side wavUrl (checked in browser with Suno cookies) over server-side detection
+    const wavUrl = preferWav
+      ? (item.wavUrl ?? (analyzeResult.wavAvailable ? analyzeResult.wavUrl : null))
+      : null;
+    const useWav = preferWav && !!wavUrl;
 
     // Update with resolved metadata
     await updateQueueItem(item.uuid, {
       status: "downloading",
       title: metadata.title ?? item.title,
       coverUrl: metadata.coverUrl ?? item.coverUrl,
-      wavAvailable: analyzeResult.wavAvailable,
+      wavAvailable: !!wavUrl,
     });
 
     // ── Import ───────────────────────────────────────────────────────────────
@@ -206,13 +209,13 @@ async function handleMessage(msg, sender) {
     }
 
     case "QUEUE_TRACK": {
-      const { uuid, url, title, coverUrl, duration } = msg.payload;
+      const { uuid, url, title, coverUrl, duration, wavUrl } = msg.payload;
       const prefs = await getPrefs();
       const albumId = msg.payload.albumId ?? prefs.albumId ?? null;
       const queue = await getQueue();
       // Avoid duplicate
       if (queue.some(i => i.uuid === uuid)) return { ok: true, duplicate: true };
-      queue.push({ uuid, url, title, coverUrl, duration, albumId, status: "pending" });
+      queue.push({ uuid, url, title, coverUrl, duration, wavUrl: wavUrl ?? null, albumId, status: "pending" });
       await setQueue(queue);
       processQueue(); // fire-and-forget
       return { ok: true };
@@ -226,7 +229,7 @@ async function handleMessage(msg, sender) {
       let added = 0;
       for (const t of tracks) {
         if (!queue.some(i => i.uuid === t.uuid)) {
-          queue.push({ ...t, albumId, status: "pending" });
+          queue.push({ ...t, wavUrl: t.wavUrl ?? null, albumId, status: "pending" });
           added++;
         }
       }

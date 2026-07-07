@@ -119,9 +119,13 @@
     const coverUrl = getCardCover(container);
     const duration = getCardDuration(container);
 
+    // Check WAV from browser (has user's Suno session cookies — server can't do this)
+    const wavAvailable = await checkWavAvailable(uuid);
+    const wavUrl = wavAvailable ? `https://cdn1.suno.ai/${uuid}.wav` : null;
+
     chrome.runtime.sendMessage({
       type: "QUEUE_TRACK",
-      payload: { uuid, url, title, coverUrl, duration, albumId: null },
+      payload: { uuid, url, title, coverUrl, duration, wavUrl },
     }, (res) => {
       if (chrome.runtime.lastError || !res?.ok) {
         setButtonState(btn, "error", "Failed");
@@ -199,10 +203,12 @@
       const title    = document.title?.replace(/\s*[\|—]\s*Suno.*$/i, "").trim() ?? null;
       const coverImg = document.querySelector('meta[property="og:image"]');
       const coverUrl = coverImg?.getAttribute("content") ?? null;
+      const wavAvailable = await checkWavAvailable(uuid);
+      const wavUrl = wavAvailable ? `https://cdn1.suno.ai/${uuid}.wav` : null;
 
       chrome.runtime.sendMessage({
         type: "QUEUE_TRACK",
-        payload: { uuid, url: buildSongUrl(uuid), title, coverUrl, duration: null, albumId: null },
+        payload: { uuid, url: buildSongUrl(uuid), title, coverUrl, duration: null, wavUrl },
       }, (res) => {
         if (chrome.runtime.lastError || !res?.ok) {
           btn.disabled = false;
@@ -296,19 +302,23 @@
   async function importSelected() {
     if (selectedUUIDs.size === 0) return;
     const btn = document.getElementById("zl-do-import");
-    if (btn) { btn.disabled = true; btn.textContent = "Queuing…"; }
+    if (btn) { btn.disabled = true; btn.textContent = "Checking WAV…"; }
 
     const tracks = [];
     for (const uuid of selectedUUIDs) {
       const card  = document.querySelector(`[${ZL_UUID}="${uuid}"]`);
       const title = card ? getCardTitle(card) : null;
       const cover = card ? getCardCover(card) : null;
-      tracks.push({ uuid, url: buildSongUrl(uuid), title, coverUrl: cover, duration: null });
+      const wavAvailable = await checkWavAvailable(uuid);
+      const wavUrl = wavAvailable ? `https://cdn1.suno.ai/${uuid}.wav` : null;
+      tracks.push({ uuid, url: buildSongUrl(uuid), title, coverUrl: cover, duration: null, wavUrl });
     }
+
+    if (btn) btn.textContent = "Queuing…";
 
     chrome.runtime.sendMessage({
       type: "QUEUE_TRACKS",
-      payload: { tracks, albumId: null },
+      payload: { tracks },
     }, (res) => {
       if (btn) {
         btn.textContent = res?.added
