@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Generates icon PNG files for the Zoundlist Suno Importer extension.
-// No npm packages required — uses only Node.js built-ins.
-// Usage: node create-icons.js
+// Generates Zoundlist icon PNGs — neon green rounded square + black Z isotipo.
+// No npm packages required.  Usage: node create-icons.js
 
 const fs   = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 
+// ── PNG plumbing ──────────────────────────────────────────────────────────────
 function crc32(buf) {
   const table = Array.from({ length: 256 }, (_, n) => {
     let c = n;
@@ -17,83 +17,96 @@ function crc32(buf) {
   for (let i = 0; i < buf.length; i++) c = (table[(c ^ buf[i]) & 0xff] ^ (c >>> 8)) >>> 0;
   return (c ^ 0xffffffff) >>> 0;
 }
-
 function makeChunk(type, data) {
-  const typeB    = Buffer.from(type, "ascii");
-  const lenB     = Buffer.allocUnsafe(4);
-  const crcB     = Buffer.allocUnsafe(4);
+  const typeB = Buffer.from(type, "ascii");
+  const lenB  = Buffer.allocUnsafe(4);
+  const crcB  = Buffer.allocUnsafe(4);
   lenB.writeUInt32BE(data.length, 0);
   crcB.writeUInt32BE(crc32(Buffer.concat([typeB, data])), 0);
   return Buffer.concat([lenB, typeB, data, crcB]);
 }
-
 function makePNG(size, draw) {
-  const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-  const ihdrData = Buffer.allocUnsafe(13);
-  ihdrData.writeUInt32BE(size, 0);
-  ihdrData.writeUInt32BE(size, 4);
-  ihdrData[8] = 8;  // bit depth
-  ihdrData[9] = 2;  // RGB color
-  ihdrData[10] = ihdrData[11] = ihdrData[12] = 0;
-
-  const rowSize = size * 3;
-  const raw = Buffer.alloc((rowSize + 1) * size);
+  const sig  = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]);
+  const ihdr = Buffer.allocUnsafe(13);
+  ihdr.writeUInt32BE(size,0); ihdr.writeUInt32BE(size,4);
+  ihdr[8]=8; ihdr[9]=2; ihdr[10]=ihdr[11]=ihdr[12]=0;
+  const rowLen = size * 3;
+  const raw    = Buffer.alloc((rowLen + 1) * size);
   for (let y = 0; y < size; y++) {
-    raw[y * (rowSize + 1)] = 0; // filter byte (None)
+    raw[y * (rowLen + 1)] = 0;
     for (let x = 0; x < size; x++) {
-      const [r, g, b] = draw(x, y, size);
-      const o = y * (rowSize + 1) + 1 + x * 3;
-      raw[o] = r; raw[o + 1] = g; raw[o + 2] = b;
+      const [r,g,b] = draw(x, y, size);
+      const o = y * (rowLen + 1) + 1 + x * 3;
+      raw[o] = r; raw[o+1] = g; raw[o+2] = b;
     }
   }
-
-  return Buffer.concat([
-    sig,
-    makeChunk("IHDR", ihdrData),
-    makeChunk("IDAT", zlib.deflateSync(raw)),
-    makeChunk("IEND", Buffer.alloc(0)),
-  ]);
+  return Buffer.concat([sig, makeChunk("IHDR",ihdr), makeChunk("IDAT",zlib.deflateSync(raw)), makeChunk("IEND",Buffer.alloc(0))]);
 }
 
-// Draw function: dark bg with neon green "Z" play-button icon
-function drawIcon(x, y, size) {
-  const cx = size / 2, cy = size / 2;
-  const r  = size * 0.42;
+// ── Zoundlist icon drawing ─────────────────────────────────────────────────────
+// Brand: neon green #95F908 background, rounded square, black Z isotipo + dot
+function drawZoundlist(px, py, size) {
+  const x = px / size;   // normalized 0..1
+  const y = py / size;
 
-  // Background: dark circle
-  const dx = x - cx, dy = y - cy;
-  if (dx * dx + dy * dy > r * r) return [13, 13, 13]; // #0D0D0D outside circle
+  // ── 1. Rounded rectangle (icon shape) ────────────────────────────────────
+  const cr = 0.18;   // corner radius (≈23px at 128px size)
+  const bx = Math.max(cr, Math.min(1 - cr, x));
+  const by = Math.max(cr, Math.min(1 - cr, y));
+  if ((x - bx) * (x - bx) + (y - by) * (y - by) > cr * cr) {
+    return [0xff, 0xff, 0xff];  // outside rounded rect → white (Chrome clips it)
+  }
 
-  // Circle fill: very dark
-  const inCircle = dx * dx + dy * dy <= r * r;
+  // ── 2. Z shape parameters ─────────────────────────────────────────────────
+  const pad = 0.155;         // left / right padding
+  const bh  = 0.205;         // bar thickness (top & bottom strokes)
+  const L   = pad;
+  const R   = 1 - pad;
+  const T   = pad + 0.03;    // top of Z (slightly inside rounded area)
+  const B   = 1 - pad - 0.03;
 
-  // Draw a simple "play" triangle in neon green
-  const tx = x / size, ty = y / size;
-  const margin = 0.28;
-  const inTriangle =
-    tx >= margin + ty * 0.12 &&
-    tx <= 0.82 - ty * 0.1 &&
-    ty >= margin && ty <= 1 - margin &&
-    tx >= margin + (ty - 0.5) * 0.5 - 0.05 &&
-    tx >= margin - (ty - 0.5) * 0.5 - 0.05;
+  const topT = T;
+  const topB = T + bh;
+  const botT = B - bh;
+  const botB = B;
 
-  // Simpler: filled triangle pointing right
-  const px = (x - size * 0.28) / size;
-  const py = (y - size * 0.5) / size;
-  const inTri = px >= 0 && px <= 0.44 && Math.abs(py) <= (0.44 - px) * 0.55;
+  // ── Top bar ───────────────────────────────────────────────────────────────
+  if (x >= L && x <= R && y >= topT && y <= topB) return [0,0,0];
 
-  if (inCircle && inTri) return [0x95, 0xF9, 0x08]; // neon green #95F908
-  if (inCircle)          return [0x17, 0x17, 0x17]; // #171717 surface
-  return [0x0D, 0x0D, 0x0D];                        // #0D0D0D bg
+  // ── Bottom bar ────────────────────────────────────────────────────────────
+  if (x >= L && x <= R && y >= botT && y <= botB) return [0,0,0];
+
+  // ── Diagonal (thick line from (R, topB) → (L, botT)) ─────────────────────
+  {
+    const dx  = L - R,  dy  = botT - topB;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    // Projection along the line
+    const t   = ((x - R) * dx + (y - topB) * dy) / (dx*dx + dy*dy);
+    // Perpendicular distance
+    const perp = Math.abs((x - R) * dy - (y - topB) * dx) / len;
+    if (perp <= bh * 0.52 && t >= -0.01 && t <= 1.01) return [0,0,0];
+  }
+
+  // ── Dot (upper-right, above top bar) ────────────────────────────────────
+  {
+    const dotCX = R - bh * 0.05;     // ~right edge of Z
+    const dotCY = T - bh * 0.48;     // above top bar
+    const dotR  = bh * 0.44;         // radius ≈ 9px at 128px
+    const ddx = x - dotCX, ddy = y - dotCY;
+    if (ddx*ddx + ddy*ddy <= dotR*dotR) return [0,0,0];
+  }
+
+  // ── Background ────────────────────────────────────────────────────────────
+  return [0x95, 0xF9, 0x08];   // #95F908 neon green
 }
 
+// ── Generate ──────────────────────────────────────────────────────────────────
 const iconsDir = path.join(__dirname, "icons");
 if (!fs.existsSync(iconsDir)) fs.mkdirSync(iconsDir, { recursive: true });
 
 for (const size of [16, 48, 128]) {
-  const png = makePNG(size, drawIcon);
+  const png = makePNG(size, drawZoundlist);
   fs.writeFileSync(path.join(iconsDir, `icon${size}.png`), png);
-  process.stdout.write(`✓ icon${size}.png (${png.length} bytes)\n`);
+  process.stdout.write(`✓ icon${size}.png  (${png.length} bytes)\n`);
 }
-process.stdout.write("Icons created in ./icons/\n");
+process.stdout.write("Icons updated in ./icons/\n");
